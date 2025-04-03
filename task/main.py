@@ -10,8 +10,8 @@ from typing import Optional
 import jwt
 import os
 from datetime import datetime, timedelta
-
 import requests
+from firebase_admin import auth as firebase_auth
 
 # Initialize Firebase Admin SDK with credentials
 cred = credentials.Certificate("cloud-c8d3a-firebase-adminsdk-fbsvc-f03dced741.json")
@@ -53,6 +53,9 @@ class Token(BaseModel):
     
 class ForgotPasswordRequest(BaseModel):
     email: str
+
+class GoogleLoginRequest(BaseModel):
+    token: str
     
 # Helper functions
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -154,6 +157,52 @@ async def login(user_data: UserLogin, response: Response):
         raise HTTPException(status_code=401, detail="Invalid user credentials")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
+
+@app.post("/auth/google")
+async def google_login(request: GoogleLoginRequest, response: Response):
+    try:
+        # Verify the Google ID token
+        decoded_token = firebase_auth.verify_id_token(request.token)
+        uid = decoded_token['uid']
+        
+        # Check if user exists in Firestore
+        user_doc = db.collection('users').document(uid).get()
+        
+        if not user_doc.exists:
+            # Create new user record if this is their first time signing in
+            user_data = {
+                'uid': uid,
+                'email': decoded_token.get('email'),
+                'name': decoded_token.get('name'),
+                'photo_url': decoded_token.get('picture'),
+                'created_at': datetime.utcnow().isoformat()
+            }
+            db.collection('users').document(uid).set(user_data)
+        
+        # Create access token
+        expires = timedelta(days=30)  # You can adjust this as needed
+        access_token = create_access_token(
+            data={"sub": uid, "email": decoded_token.get('email')},
+            expires_delta=expires
+        )
+        
+        # Set the token as a cookie
+        response.set_cookie(
+            key="token",
+            value=access_token,
+            httponly=True,
+            max_age=expires.total_seconds(),
+            expires=expires.total_seconds(),
+            samesite="lax",
+            secure=False  # Set to True in production with HTTPS
+        )
+        
+        return {"access_token": access_token, "token_type": "bearer", "user_id": uid}
+    
+    except firebase_auth.InvalidIdTokenError:
+        raise HTTPException(status_code=401, detail="Invalid Google token")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Google login failed: {str(e)}")
 
 @app.post("/auth/register")
 async def signup(user_data: UserCreate):
