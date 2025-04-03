@@ -1,3 +1,4 @@
+/* General styles */
 body {
     background-color: #f0f7ff;
     height: 100vh;
@@ -8,6 +9,7 @@ body {
     justify-content: center;
 }
 
+/* Login container styles */
 .login-container {
     background-color: white;
     padding: 32px;
@@ -101,22 +103,22 @@ body {
     margin-bottom: 24px;
 }
 
-.remember-me {
+/* .remember-me {
     display: flex;
     align-items: center;
-}
+} */
 
-.checkbox {
+/* .checkbox {
     height: 16px;
     width: 16px;
     accent-color: #3b82f6;
-}
+} */
 
-.checkbox-label {
+/* .checkbox-label {
     margin-left: 8px;
     font-size: 0.875rem;
     color: #4b5563;
-}
+} */
 
 .forgot-password {
     font-size: 0.875rem;
@@ -153,6 +155,7 @@ body {
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
 }
 
+/* Signup option styles  */
 .signup-prompt {
     text-align: center;
     margin-top: 20px;
@@ -171,6 +174,7 @@ body {
     color: #2563eb;
 }
 
+/* Loading style for login button  */
 .button-loading {
     display: inline-flex;
     align-items: center;
@@ -185,7 +189,8 @@ body {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
-  
+
+/* Error message styles */
 .error-message {
     color: #dc3545;
     background-color: #f8d7da;
@@ -198,7 +203,7 @@ body {
     transition: opacity 1s ease-out;
 }
 
-
+/* Forgot password pop-up window styles  */
 .modal {
     display: none;
     position: fixed;

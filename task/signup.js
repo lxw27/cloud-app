@@ -1,6 +1,7 @@
 document.getElementById('signupForm').addEventListener('submit', async function(event) {
     event.preventDefault();
 
+    // Get input values
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
     const confirmPassword = document.getElementById('confirmPassword').value;
@@ -13,10 +14,11 @@ document.getElementById('signupForm').addEventListener('submit', async function(
         existingError.remove();
     }
 
-    // Reset button state at start
+    // Reset button state to clickable
     signupButton.textContent = originalButtonText;
     signupButton.disabled = false;
 
+    // Validate password field
     if (password !== confirmPassword) {
         showErrorMessage("Passwords don't match");
         return;
@@ -28,9 +30,11 @@ document.getElementById('signupForm').addEventListener('submit', async function(
     }
 
     try {
+        // Show loading state for signup button
         signupButton.innerHTML = '<span class="button-loading"><i class="fas fa-spinner fa-spin"></i> Signing up...</span>';
         signupButton.disabled = true;
         
+        // Send signup request to FastAPI
         const response = await fetch('http://localhost:8000/auth/register', {
             method: 'POST',
             headers: {
@@ -49,7 +53,7 @@ document.getElementById('signupForm').addEventListener('submit', async function(
         
         const data = await response.json();
         
-        // Show success message before redirect
+        // Show success message before redirect to login page
         const successMessage = document.createElement('div');
         successMessage.className = 'error-message';
         successMessage.style.backgroundColor = '#d4edda';
@@ -65,18 +69,18 @@ document.getElementById('signupForm').addEventListener('submit', async function(
     } catch (error) {
         showErrorMessage(`Error: ${error.message}`);
     } finally {
-        // This will run regardless of success or failure
         signupButton.innerHTML = originalButtonText;
         signupButton.disabled = false;
     }
 });
 
-// Password visibility toggle functions
+// Password visibility toggle 
 const togglePasswordVisibility = (inputId, toggleId) => {
     document.getElementById(toggleId).addEventListener('click', function() {
         const passwordInput = document.getElementById(inputId);
         const toggleIcon = this.querySelector('i');
         
+        // Toggle the password input type (visible or not)
         if (passwordInput.type === 'password') {
             passwordInput.type = 'text';
             toggleIcon.classList.remove('fa-eye');
@@ -92,7 +96,7 @@ const togglePasswordVisibility = (inputId, toggleId) => {
 togglePasswordVisibility('password', 'togglePassword');
 togglePasswordVisibility('confirmPassword', 'toggleConfirmPassword');
 
-// Helper function to show error messages (matches login style)
+// Helper function to show error messages 
 function showErrorMessage(message) {
     // Remove any existing error messages
     const existingError = document.querySelector('.error-message');
@@ -100,7 +104,7 @@ function showErrorMessage(message) {
         existingError.remove();
     }
     
-    // Create and style the error message element
+    // Create error message element
     const errorMessage = document.createElement('div');
     errorMessage.className = 'error-message';
     errorMessage.textContent = message;
@@ -108,12 +112,12 @@ function showErrorMessage(message) {
     // Insert error message above the form
     document.querySelector('.signup-header').appendChild(errorMessage);
     
-    // Set timeout to fade out the error message after 5 seconds
+    // Removes error message after fade out
     setTimeout(() => {
         errorMessage.style.transition = 'opacity 1s ease-out';
         errorMessage.style.opacity = '0';
         
-        // Remove the element after fade out completes
+        // Remove error message after fade out
         setTimeout(() => {
             if (errorMessage.parentNode) {
                 errorMessage.parentNode.removeChild(errorMessage);
