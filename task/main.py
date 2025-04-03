@@ -11,6 +11,8 @@ import jwt
 import os
 from datetime import datetime, timedelta
 
+import requests
+
 # Initialize Firebase Admin SDK with credentials
 cred = credentials.Certificate("cloud-c8d3a-firebase-adminsdk-fbsvc-f03dced741.json")
 firebase_admin.initialize_app(cred)
@@ -48,6 +50,9 @@ class UserCreate(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+    
+class ForgotPasswordRequest(BaseModel):
+    email: str
     
 # Helper functions
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -90,52 +95,6 @@ async def get_current_user(token: str = Cookie(None)):
 @app.get("/")
 def read_root():
     return {"message": "SubTrack API - User Authentication Service"}
-
-# @app.post("/auth/login")
-# async def login(user_data: UserLogin, response: Response):
-#     try:
-#         # Authenticate with Firebase
-#         user = auth.get_user_by_email(user_data.email)
-        
-#         # Get user data from Firestore
-#         user_doc = db.collection('users').document(user.uid).get()
-#         if not user_doc.exists:
-#             raise HTTPException(status_code=401, detail="Invalid login credentials")
-        
-#         user_dict = user_doc.to_dict()
-        
-#         # Correct print statement
-#         print(f"Stored password: '{user_dict.get('password_hash')}', Type: {type(user_dict.get('password_hash'))}")
-
-#         # Check if password matches (not recommended for production)
-#         password_hash = user_dict.get('password_hash')
-#         if password_hash is None or password_hash != user_data.password:
-#             raise HTTPException(status_code=401, detail="Invalid password credentials")
-        
-#         # Create access token
-#         expires = timedelta(days=30 if user_data.remember_me else 1)
-#         access_token = create_access_token(
-#             data={"sub": user.uid, "email": user_data.email},
-#             expires_delta=expires
-#         )
-        
-#         # Set the token as a cookie
-#         response.set_cookie(
-#             key="token",
-#             value=access_token,
-#             httponly=True,
-#             max_age=expires.total_seconds() if user_data.remember_me else None,
-#             expires=expires.total_seconds() if user_data.remember_me else None,
-#             samesite="lax",
-#             secure=False  # Set to True in production with HTTPS
-#         )
-        
-#         return {"access_token": access_token, "token_type": "bearer", "user_id": user.uid}
-    
-#     except auth.UserNotFoundError:
-#         raise HTTPException(status_code=401, detail="Invalid user credentials")
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
 
 @app.post("/auth/login")
 async def login(user_data: UserLogin, response: Response):
@@ -237,18 +196,28 @@ async def get_me(current_user = Depends(get_current_user)):
     return current_user
 
 @app.post("/auth/forgot-password")
-async def forgot_password(email: str):
+async def forgot_password(request: ForgotPasswordRequest):
     try:
-        # Generate password reset link
-        link = auth.generate_password_reset_link(email)
-        # In a real app, you would send this link via email
-        return {"message": "Password reset link sent", "link": link}
-    except auth.UserNotFoundError:
-        # Don't reveal if email exists or not for security
-        return {"message": "If your email is registered, you will receive a password reset link"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Password reset failed: {str(e)}")
+        email = request.email
+        
+        if not email:
+            raise HTTPException(status_code=400, detail="Email is required")
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+        # Firebase REST API endpoint
+        url = f"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=AIzaSyDtUAf_vVUdR_sknDbFqdAG3lu6Zo0jp9o"
+        
+        payload = {
+            "requestType": "PASSWORD_RESET",
+            "email": email
+        }
+        
+        response = requests.post(url, json=payload)
+        
+        if not response.ok:
+            error_data = response.json()
+            raise HTTPException(status_code=400, detail=error_data.get("error", {}).get("message", "Failed to send reset email"))
+        
+        return {"message": "Password reset email sent"}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")

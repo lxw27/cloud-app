@@ -42,10 +42,10 @@
       </div>
       
       <div class="form-options">
-        <div class="remember-me">
+        <!-- <div class="remember-me">
           <input id="remember-me" name="remember-me" type="checkbox" class="checkbox">
           <label for="remember-me" class="checkbox-label">Remember me</label>
-        </div>
+        </div> -->
         
         <a href="#" class="forgot-password">Forgot password?</a>
       </div>
@@ -58,108 +58,32 @@
       <a href="signup.html" class="signup-link">Sign up</a>
     </div>
   </div>
-  
-  <script>
-    // Form submission
-    document.getElementById('loginForm').addEventListener('submit', async function(event) {
-    event.preventDefault();
-    
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    const rememberMe = document.getElementById('remember-me').checked;
 
-    const loginButton = document.querySelector('.btn-login');
-    const originalButtonText = loginButton.textContent;
-    
-    try {
-        // Show loading state
-        loginButton.textContent = 'Logging in...';
-        loginButton.disabled = true;
+  <div id="forgotPasswordModal" class="modal">
+    <div class="modal-content">
+      <span class="close-modal">&times;</span>
+      <h2>Reset Password</h2>
+      <p>Enter your email address and we'll send you a link to reset your password.</p>
+      
+      <form id="forgotPasswordForm">
+        <div class="form-group">
+          <label for="reset-email" class="form-label">Email Address</label>
+          <div class="input-group">
+            <div class="input-icon">
+              <i class="fas fa-envelope"></i>
+            </div>
+            <input type="email" id="reset-email" name="email" class="form-input" placeholder="you@example.com" required>
+          </div>
+        </div>
         
-        // Send login request to FastAPI backend
-        const response = await fetch('http://localhost:8000/auth/login', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        credentials: 'include', // Important for cookies
-        body: JSON.stringify({
-            email: email,
-            password: password,
-            remember_me: rememberMe
-        })
-        });
+        <div id="resetFeedback" class="feedback-message"></div>
         
-        if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Login failed');
-        }
-        
-        const data = await response.json();
-        
-        // Store token in localStorage (optional, since we're also using HTTP-only cookies)
-        if (rememberMe) {
-        localStorage.setItem('user_id', data.user_id);
-        } else {
-        sessionStorage.setItem('user_id', data.user_id);
-        }
-        
-        // Redirect to dashboard
-        window.location.href = 'dashboard.html';
-    } catch (error) {
-        // Display error message
-        alert(`Error: ${error.message}`);
-        
-        // Reset button state
-        loginButton.textContent = originalButtonText;
-        loginButton.disabled = false;
-    }
-    });
+        <button type="submit" class="btn-reset">Send Reset Link</button>
+      </form>
+    </div>
+  </div>
 
-    // Password visibility toggle
-    document.getElementById('togglePassword').addEventListener('click', function() {
-    const passwordInput = document.getElementById('password');
-    const toggleIcon = this.querySelector('i');
-    
-    // Toggle the password input type
-    if (passwordInput.type === 'password') {
-        passwordInput.type = 'text';
-        toggleIcon.classList.remove('fa-eye');
-        toggleIcon.classList.add('fa-eye-slash');
-    } else {
-        passwordInput.type = 'password';
-        toggleIcon.classList.remove('fa-eye-slash');
-        toggleIcon.classList.add('fa-eye');
-    }
-    });
-
-    // Add handler for forgot password link
-    document.querySelector('.forgot-password').addEventListener('click', async function(event) {
-    event.preventDefault();
-    
-    const email = document.getElementById('email').value;
-    if (!email) {
-        alert('Please enter your email address first');
-        return;
-    }
-    
-    try {
-        const response = await fetch('http://localhost:8000/auth/forgot-password', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email })
-        });
-        
-        const data = await response.json();
-        alert(data.message);
-    } catch (error) {
-        alert(`Error: ${error.message}`);
-    }
-    });
-    
-  </script>
+  <script src="login.js"></script>
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>

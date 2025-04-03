@@ -130,7 +130,6 @@ body {
     color: #2563eb;
 }
 
-/* Button */
 .btn-login {
     display: block;
     width: 100%;
@@ -154,7 +153,6 @@ body {
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
 }
 
-/* Footer */
 .signup-prompt {
     text-align: center;
     margin-top: 20px;
@@ -171,4 +169,109 @@ body {
 
 .signup-link:hover {
     color: #2563eb;
+}
+
+.button-loading {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+  
+.fa-spin {
+    animation: fa-spin 1s infinite linear;
+}
+  
+@keyframes fa-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+  
+.error-message {
+    color: #dc3545;
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin-top: 10px;
+    font-size: 14px;
+    opacity: 1;
+    transition: opacity 1s ease-out;
+}
+
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 100;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(5px);
+}
+  
+.modal-content {
+    background-color: #fff;
+    margin: 10% auto;
+    padding: 25px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 450px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    position: relative;
+}
+  
+.close-modal {
+    position: absolute;
+    right: 20px;
+    top: 15px;
+    font-size: 24px;
+    cursor: pointer;
+    color: #888;
+}
+  
+.close-modal:hover {
+    color: #333;
+}
+  
+.btn-reset {
+    width: 100%;
+    padding: 12px;
+    background-color: #4a6bff;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    cursor: pointer;
+    margin-top: 15px;
+    transition: background-color 0.3s;
+}
+  
+.btn-reset:hover {
+    background-color: #3a56d4;
+}
+  
+.btn-reset:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+  
+.feedback-message {
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 4px;
+    display: none;
+}
+  
+.feedback-message.success {
+    background-color: #d4edda;
+    color: #155724;
+    display: block;
+}
+  
+.feedback-message.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    display: block;
 }
