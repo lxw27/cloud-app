@@ -1,12 +1,12 @@
 from fastapi import FastAPI, HTTPException, Response, Request, Cookie, Depends
-from fastapi.security import HTTPBasicCredentials
+from fastapi.security import HTTPBasicCredentials, HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from firebase_admin import credentials, firestore, initialize_app, auth
 import firebase_admin
 from pydantic import BaseModel
 import secrets
 import uuid
-from typing import Optional
+from typing import Optional, List
 import jwt
 import os
 from datetime import datetime, timedelta
@@ -22,6 +22,7 @@ db = firestore.client()
 
 # Create FastAPI app
 app = FastAPI()
+security = HTTPBearer()
 
 # Configure CORS
 app.add_middleware(
@@ -56,6 +57,19 @@ class ForgotPasswordRequest(BaseModel):
 
 class GoogleLoginRequest(BaseModel):
     token: str
+
+class Subscription(BaseModel):
+    service_name: str
+    cost: float
+    billing_cycle: str
+    next_renewal_date: str  # Format: YYYY-MM-DD
+    status: str
+    user_id: str
+
+class SubscriptionResponse(Subscription):
+    subscription_id: str
+    created_at: datetime
+    updated_at: datetime
     
 # Helper functions
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -270,3 +284,123 @@ async def forgot_password(request: ForgotPasswordRequest):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing request: {str(e)}")
+    
+@app.get("/api/subscriptions")
+async def get_subscriptions(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        # Verify Firebase token
+        decoded_token = auth.verify_id_token(credentials.credentials)
+        user_id = decoded_token['uid']
+        
+        # Rest of your subscription logic
+        subscriptions = []
+        docs = db.collection('subscriptions').where('user_id', '==', user_id).stream()
+        for doc in docs:
+            sub = doc.to_dict()
+            sub['subscription_id'] = doc.id
+            subscriptions.append(sub)
+        return subscriptions
+        
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=str(e))
+
+@app.get("/api/subscriptions/{subscription_id}", response_model=SubscriptionResponse)
+async def get_subscription(subscription_id: str):
+    doc = db.collection('subscriptions').document(subscription_id).get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    sub = doc.to_dict()
+    sub['subscription_id'] = doc.id
+    return sub
+
+@app.post("/api/subscriptions", response_model=SubscriptionResponse)
+async def create_subscription(subscription: Subscription, credentials: HTTPAuthorizationCredentials = Depends(security)):
+    try:
+        # Verify Firebase ID token
+        decoded_token = auth.verify_id_token(credentials.credentials)
+        if decoded_token['uid'] != subscription.user_id:
+            raise HTTPException(status_code=403, detail="Unauthorized")
+        
+        # Add to Firestore
+        doc_ref = db.collection('subscriptions').document()
+        now = datetime.now()
+        subscription_data = subscription.dict()
+        subscription_data['created_at'] = now
+        subscription_data['updated_at'] = now
+        doc_ref.set(subscription_data)
+        
+        # Return created subscription
+        created_sub = subscription_data.copy()
+        created_sub['subscription_id'] = doc_ref.id
+        return created_sub
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.put("/api/subscriptions/{subscription_id}", response_model=SubscriptionResponse)
+async def update_subscription(
+    subscription_id: str, 
+    subscription: Subscription,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    try:
+        # Verify Firebase ID token
+        decoded_token = auth.verify_id_token(credentials.credentials)
+        if decoded_token['uid'] != subscription.user_id:
+            raise HTTPException(status_code=403, detail="Unauthorized")
+        
+        # Update in Firestore
+        doc_ref = db.collection('subscriptions').document(subscription_id)
+        if not doc_ref.get().exists:
+            raise HTTPException(status_code=404, detail="Subscription not found")
+        
+        update_data = subscription.dict()
+        update_data['updated_at'] = datetime.now()
+        doc_ref.update(update_data)
+        
+        # Return updated subscription
+        updated_sub = doc_ref.get().to_dict()
+        updated_sub['subscription_id'] = subscription_id
+        return updated_sub
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.delete("/api/subscriptions/{subscription_id}")
+async def delete_subscription(
+    subscription_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    try:
+        # Verify Firebase ID token
+        decoded_token = auth.verify_id_token(credentials.credentials)
+        
+        # Check if subscription belongs to user
+        doc_ref = db.collection('subscriptions').document(subscription_id)
+        doc = doc_ref.get()
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail="Subscription not found")
+        if doc.to_dict()['user_id'] != decoded_token['uid']:
+            raise HTTPException(status_code=403, detail="Unauthorized")
+        
+        # Delete subscription
+        doc_ref.delete()
+        return {"message": "Subscription deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/subscriptions/total")
+async def get_monthly_total(user_id: str):
+    try:
+        # Calculate total monthly cost
+        monthly_total = 0.0
+        docs = db.collection('subscriptions').where('user_id', '==', user_id).where('status', '==', 'Active').stream()
+        
+        for doc in docs:
+            sub = doc.to_dict()
+            if sub['billing_cycle'] == 'Monthly':
+                monthly_total += sub['cost']
+            else:  # Yearly
+                monthly_total += sub['cost'] / 12
+                
+        return {"total": round(monthly_total, 2)}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

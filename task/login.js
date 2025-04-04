@@ -4,86 +4,52 @@ const provider = new firebase.auth.GoogleAuthProvider();
 document.getElementById('loginForm').addEventListener('submit', async function(event) {
   event.preventDefault();
 
-  // Get input values
   const email = document.getElementById('email').value;
   const password = document.getElementById('password').value;
-  // const rememberMe = document.getElementById('remember-me').checked;
-  
   const loginButton = document.querySelector('.btn-login');
   const originalButtonText = loginButton.textContent;
   
   try {
-    // Show loading state for login button
     loginButton.innerHTML = '<span class="button-loading"><i class="fas fa-spinner fa-spin"></i> Logging in...</span>';
     loginButton.disabled = true;
     
     // Remove any existing error messages
     const existingError = document.querySelector('.error-message');
-    if (existingError) {
-        existingError.remove();
-    }
+    if (existingError) existingError.remove();
     
-    // Send login request to FastAPI 
-    const response = await fetch('http://localhost:8000/auth/login', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        credentials: 'include', 
-        body: JSON.stringify({
-            email: email,
-            password: password,
-            // remember_me: rememberMe
-        })
-    });
-    
-    if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Login failed. Please check your credentials and try again.');
-    }
-    
-    const data = await response.json();
-    
-    // Store token in localStorage (optional, since we're also using HTTP-only cookies)
-    // if (rememberMe) {
-    //     localStorage.setItem('user_id', data.user_id);
-    // } else {
-    //     sessionStorage.setItem('user_id', data.user_id);
-    // }
-    
-    // Redirect to dashboard for successful login
+    // Firebase email/password login
+    await firebase.auth().signInWithEmailAndPassword(email, password);
     window.location.href = 'dashboard.html';
+    
   } catch (error) {
-    // Display error message
-    const errorMessage = document.createElement('div');
-    errorMessage.className = 'error-message';
-    errorMessage.textContent = error.message;
-    
-    // Remove any existing error messages
-    const existingError = document.querySelector('.error-message');
-    if (existingError) {
-        existingError.remove();
-    }
-    
-    // Insert error message above the form
-    document.querySelector('.login-header').appendChild(errorMessage);
-    
-    // Fades out error message after 3 seconds
-    setTimeout(() => {
-        errorMessage.style.transition = 'opacity 1s ease-out';
-        errorMessage.style.opacity = '0';
-        
-        // Remove error message after fade out 
-        setTimeout(() => {
-            if (errorMessage.parentNode) {
-                errorMessage.parentNode.removeChild(errorMessage);
-            }
-        }, 1000);
-    }, 3000);
-    
-    // Reset button state to clickable 
+    // Error handling (keep your existing error display code)
+    console.error(error);
+    // ... your existing error display code ...
+  } finally {
     loginButton.innerHTML = originalButtonText;
     loginButton.disabled = false;
+  }
+});
+
+// Google sign-in
+document.getElementById('googleSignIn').addEventListener('click', async function() {
+  try {
+    const googleButton = document.getElementById('googleSignIn');
+    const originalButtonText = googleButton.innerHTML;
+    googleButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in...';
+    googleButton.disabled = true;
+    
+    // Firebase Google Sign-In
+    const result = await auth.signInWithPopup(provider);
+    window.location.href = 'dashboard.html';
+    
+  } catch (error) {
+    console.error(error);
+    // ... your existing error display code ...
+  } finally {
+    const googleButton = document.getElementById('googleSignIn');
+    googleButton.innerHTML = '<i class="fab fa-google"></i> Continue with Google';
+    googleButton.disabled = false;
   }
 });
     
@@ -104,74 +70,6 @@ document.getElementById('togglePassword').addEventListener('click', function() {
   }
 });
 
-// Google sign-in function
-document.getElementById('googleSignIn').addEventListener('click', async function() {
-  try {
-    // Show loading state of Google sign-in button
-    const googleButton = document.getElementById('googleSignIn');
-    const originalButtonText = googleButton.innerHTML;
-    googleButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in...';
-    googleButton.disabled = true;
-    
-    // Sign in with Google
-    const result = await auth.signInWithPopup(provider);
-    const user = result.user;
-    
-    // Send Google ID token to backend for verification
-    const response = await fetch('http://localhost:8000/auth/google', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      body: JSON.stringify({
-        token: await user.getIdToken()
-      })
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Google login failed');
-    }
-    
-    // Redirect to dashboard if sign-in successful
-    window.location.href = 'dashboard.html';
-    
-  } catch (error) {
-    // Display error message
-    const errorMessage = document.createElement('div');
-    errorMessage.className = 'error-message';
-    errorMessage.textContent = error.message;
-    
-    // Remove any existing error messages
-    const existingError = document.querySelector('.error-message');
-    if (existingError) {
-      existingError.remove();
-    }
-    
-    // Insert error message above the form
-    document.querySelector('.login-header').appendChild(errorMessage);
-    
-    // Fades out error message after 3 seconds
-    setTimeout(() => {
-      errorMessage.style.transition = 'opacity 1s ease-out';
-      errorMessage.style.opacity = '0';
-      
-      // Remove error message after fade out 
-      setTimeout(() => {
-        if (errorMessage.parentNode) {
-          errorMessage.parentNode.removeChild(errorMessage);
-        }
-      }, 1000);
-    }, 3000);
-    
-    // Reset button state to clickable
-    const googleButton = document.getElementById('googleSignIn');
-    googleButton.innerHTML = '<i class="fab fa-google"></i> Continue with Google';
-    googleButton.disabled = false;
-  }
-});
-    
 // Get input value for forget password 
 const forgotPasswordLink = document.querySelector('.forgot-password');
 const forgotPasswordModal = document.getElementById('forgotPasswordModal');

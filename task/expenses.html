@@ -4,60 +4,37 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SubTrack - Expenses</title>
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
-  <style>
-    .bg-blue-custom {
-      background-color: #3b82f6;
-    }
-    .text-blue-custom {
-      color: #3b82f6;
-    }
-    .hover-bg-blue-dark:hover {
-      background-color: #2563eb;
-    }
-    .focus-ring-blue:focus {
-      --tw-ring-color: #3b82f6;
-    }
-    .border-blue-focus:focus {
-      border-color: #3b82f6;
-    }
-  </style>
+  <link rel="stylesheet" href="expenses.css">
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body>
   <!-- Navigation Bar -->
-  <nav class="bg-white shadow-sm">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex justify-between h-16">
-        <div class="flex">
-          <div class="flex-shrink-0 flex items-center">
-            <h1 class="text-2xl font-bold text-blue-500">SubTrack</h1>
-          </div>
-          <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
-            <a href="dashboard.html" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-              Dashboard
-            </a>
-            <a href="expenses.html" class="border-blue-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-              Expenses
-            </a>
-          </div>
+  <nav class="navbar">
+    <div class="navbar-container">
+      <div class="navbar-left">
+        <div class="brand-logo">
+          <h1 class="brand-name">SubTrack</h1>
         </div>
-        <div class="flex items-center">
-          <div class="hidden md:ml-4 md:flex-shrink-0 md:flex md:items-center">
-            <div class="ml-3 relative">
-              <div class="flex items-center">
-                <span class="text-sm font-medium text-gray-700 mr-2">John Doe</span>
-                <button id="userMenuButton" class="bg-white rounded-full flex text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                  <span class="sr-only">Open user menu</span>
-                  <img class="h-8 w-8 rounded-full" src="https://ui-avatars.com/api/?name=John+Doe&background=3b82f6&color=fff" alt="User avatar">
-                </button>
-              </div>
-              <div id="userMenu" class="hidden origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
-                <!-- <a href="#" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Your Profile</a> -->
-                <a href="login.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Sign out</a>
-              </div>
-            </div>
+        <div class="nav-links">
+          <a href="dashboard.html" class="nav-link">Dashboard</a>
+          <a href="expenses.html" class="nav-link active">Expenses</a>
+        </div>
+      </div>
+      <div class="navbar-right">
+        <div class="user-menu-container">
+          <div class="user-info">
+            <span class="user-name">John Doe</span>
+            <button id="userMenuButton" class="user-avatar-btn">
+              <span class="sr-only">Open user menu</span>
+              <img class="user-avatar" src="https://ui-avatars.com/api/?name=John+Doe&background=3b82f6&color=fff" alt="User avatar">
+            </button>
+          </div>
+          <div id="userMenu" class="dropdown-menu hidden">
+            <a href="#" class="dropdown-item">Your Profile</a>
+            <a href="#" class="dropdown-item">Settings</a>
+            <a href="login.html" class="dropdown-item">Sign out</a>
           </div>
         </div>
       </div>
@@ -65,49 +42,43 @@
   </nav>
 
   <!-- Main Content -->
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+  <div class="main-container">
     <!-- Header Section -->
-    <div class="md:flex md:items-center md:justify-between mb-6">
-      <div class="flex-1 min-w-0">
-        <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
-          Subscription Expenses
-        </h2>
-        <div class="mt-1 flex flex-col sm:flex-row sm:flex-wrap sm:mt-0 sm:space-x-6">
-          <div class="mt-2 flex items-center text-sm text-gray-500">
-            <i class="fas fa-calendar-alt flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400"></i>
+    <div class="page-header">
+      <div class="header-content">
+        <h2 class="page-title">Subscription Expenses</h2>
+        <div class="header-meta">
+          <div class="meta-item">
+            <i class="fas fa-calendar-alt meta-icon"></i>
             As of March 22, 2025
           </div>
-          <div class="mt-2 flex items-center text-sm text-gray-500">
-            <i class="fas fa-chart-pie flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400"></i>
+          <div class="meta-item">
+            <i class="fas fa-chart-pie meta-icon"></i>
             Monthly spending: $89.97
           </div>
-          <div class="mt-2 flex items-center text-sm text-gray-500">
-            <i class="fas fa-chart-line flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400"></i>
+          <div class="meta-item">
+            <i class="fas fa-chart-line meta-icon"></i>
             Yearly projection: $933.64
           </div>
         </div>
       </div>
-      <div class="mt-4 flex md:mt-0 md:ml-4">
-        <a href="reports.html" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-          <i class="fas fa-file-alt mr-2"></i> Generate Report
+      <div class="header-actions">
+        <a href="reports.html" class="btn btn-primary">
+          <i class="fas fa-file-alt btn-icon"></i> Generate Report
         </a>
       </div>
     </div>
 
     <!-- Time Period Filter -->
-    <div class="bg-white shadow rounded-lg p-4 mb-6">
-      <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 items-center">
-        <div class="text-sm font-medium text-gray-700">View expenses by:</div>
-        <div class="flex space-x-2">
-          <button id="monthlyBtn" class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-            Monthly
-          </button>
-          <button id="yearlyBtn" class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-            Yearly
-          </button>
+    <div class="filter-card">
+      <div class="filter-container">
+        <div class="filter-label">View expenses by:</div>
+        <div class="filter-buttons">
+          <button id="monthlyBtn" class="btn btn-primary">Monthly</button>
+          <button id="yearlyBtn" class="btn btn-secondary">Yearly</button>
         </div>
-        <div class="relative flex-grow">
-          <select id="periodSelect" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+        <div class="filter-select">
+          <select id="periodSelect" class="form-select">
             <option value="2025-03">March 2025</option>
             <option value="2025-02">February 2025</option>
             <option value="2025-01">January 2025</option>
@@ -120,51 +91,51 @@
     </div>
 
     <!-- Charts Section -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <div class="charts-grid">
       <!-- Expense Distribution Chart -->
-      <div class="bg-white shadow rounded-lg p-4">
-        <h3 class="text-lg font-medium text-gray-900 mb-4">Expense Distribution</h3>
-        <div class="h-64">
+      <div class="chart-card">
+        <h3 class="chart-title">Expense Distribution</h3>
+        <div class="chart-container">
           <canvas id="pieChart"></canvas>
         </div>
       </div>
       
       <!-- Expense Trend Chart -->
-      <div class="bg-white shadow rounded-lg p-4">
-        <h3 class="text-lg font-medium text-gray-900 mb-4">Expense Trend</h3>
-        <div class="h-64">
+      <div class="chart-card">
+        <h3 class="chart-title">Expense Trend</h3>
+        <div class="chart-container">
           <canvas id="barChart"></canvas>
         </div>
       </div>
     </div>
 
     <!-- Expense Breakdown Table -->
-    <div class="bg-white shadow overflow-hidden sm:rounded-lg">
-      <div class="px-4 py-5 sm:px-6 flex justify-between items-center">
-        <h3 class="text-lg leading-6 font-medium text-gray-900">Monthly Expense Breakdown</h3>
+    <div class="table-card">
+      <div class="table-header">
+        <h3 class="table-title">Monthly Expense Breakdown</h3>
       </div>
-      <div class="border-t border-gray-200">
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead class="bg-gray-50">
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
             <tr>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subscription</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Billing Cycle</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Billed</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Billing</th>
-              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monthly Cost</th>
+              <th>Subscription</th>
+              <th>Billing Cycle</th>
+              <th>Last Billed</th>
+              <th>Next Billing</th>
+              <th>Monthly Cost</th>
             </tr>
           </thead>
-          <tbody class="bg-white divide-y divide-gray-200" id="expenseBreakdown">
+          <tbody id="expenseBreakdown">
             <!-- Expense rows will be populated here -->
           </tbody>
-          <tfoot class="bg-gray-50">
+          <tfoot>
             <tr>
-              <td colspan="4" class="px-6 py-4 text-right text-sm font-medium text-gray-900">Total Monthly:</td>
-              <td class="px-6 py-4 text-sm text-gray-900 font-bold">$89.97</td>
+              <td colspan="4" class="totals-label">Total Monthly:</td>
+              <td class="totals-value">$89.97</td>
             </tr>
             <tr>
-              <td colspan="4" class="px-6 py-4 text-right text-sm font-medium text-gray-900">Yearly Projection:</td>
-              <td class="px-6 py-4 text-sm text-gray-900 font-bold">$933.64</td>
+              <td colspan="4" class="totals-label">Yearly Projection:</td>
+              <td class="totals-value">$933.64</td>
             </tr>
           </tfoot>
         </table>
@@ -267,30 +238,24 @@
         
         const row = document.createElement('tr');
         row.innerHTML = `
-          <td class="px-6 py-4 whitespace-nowrap">
-            <div class="flex items-center">
-              <div class="flex-shrink-0 h-10 w-10 flex items-center justify-center rounded-full bg-blue-100 text-blue-500">
+          <td>
+            <div class="subscription-info">
+              <div class="subscription-icon ${getIconClass(sub.name)}">
                 <i class="fas fa-${getIconForSubscription(sub.name)}"></i>
               </div>
-              <div class="ml-4">
-                <div class="text-sm font-medium text-gray-900">${sub.name}</div>
-                <div class="text-xs text-gray-500">${sub.status === 'active' ? 'Active' : 'Cancelled'}</div>
+              <div class="subscription-details">
+                <div class="subscription-name">${sub.name}</div>
+                <div class="subscription-status">${sub.status === 'active' ? 'Active' : 'Cancelled'}</div>
               </div>
             </div>
           </td>
-          <td class="px-6 py-4 whitespace-nowrap">
-            <div class="text-sm text-gray-900">${sub.billingCycle.charAt(0).toUpperCase() + sub.billingCycle.slice(1)}</div>
-          </td>
-          <td class="px-6 py-4 whitespace-nowrap">
-            <div class="text-sm text-gray-900">${formatDate(sub.lastBilled)}</div>
-          </td>
-          <td class="px-6 py-4 whitespace-nowrap">
-            <div class="text-sm text-gray-900">${formatDate(sub.nextRenewal)}</div>
-          </td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+          <td class="billing-cycle">${sub.billingCycle.charAt(0).toUpperCase() + sub.billingCycle.slice(1)}</td>
+          <td class="billing-date">${formatDate(sub.lastBilled)}</td>
+          <td class="billing-date">${formatDate(sub.nextRenewal)}</td>
+          <td class="cost-cell">
             $${monthlyEquivalent.toFixed(2)}
             ${sub.billingCycle === 'yearly' ? 
-              `<span class="text-xs text-gray-500">($${sub.cost.toFixed(2)}/year)</span>` : ''}
+              `<span class="yearly-cost">($${sub.cost.toFixed(2)}/year)</span>` : ''}
           </td>
         `;
         
@@ -316,6 +281,19 @@
       };
       
       return iconMap[name] || 'credit-card';
+    }
+
+    // Get icon class for subscription
+    function getIconClass(name) {
+      const classMap = {
+        'Netflix': 'icon-netflix',
+        'Spotify': 'icon-spotify',
+        'Amazon Prime': 'icon-amazon',
+        'New York Times': 'icon-news',
+        'Hulu': 'icon-hulu'
+      };
+      
+      return classMap[name] || 'icon-default';
     }
 
     // Initialize Pie Chart for expense distribution
@@ -422,18 +400,18 @@
 
     // Toggle between monthly and yearly views
     monthlyBtn.addEventListener('click', function() {
-      monthlyBtn.classList.remove('border-gray-300', 'text-gray-700', 'bg-white');
-      monthlyBtn.classList.add('border-transparent', 'text-white', 'bg-blue-500');
+      monthlyBtn.classList.remove('btn-secondary');
+      monthlyBtn.classList.add('btn-primary');
       
-      yearlyBtn.classList.remove('border-transparent', 'text-white', 'bg-blue-500');
-      yearlyBtn.classList.add('border-gray-300', 'text-gray-700', 'bg-white');
+      yearlyBtn.classList.remove('btn-primary');
+      yearlyBtn.classList.add('btn-secondary');
       
       // Update period dropdown for months
       updatePeriodDropdown(true);
       
       // Re-init bar chart for monthly view
       document.getElementById('barChart').remove();
-      const chartContainer = document.querySelector('.h-64:nth-of-type(2)');
+      const chartContainer = document.querySelector('.chart-container:nth-of-type(2)');
       const newCanvas = document.createElement('canvas');
       newCanvas.id = 'barChart';
       chartContainer.appendChild(newCanvas);
@@ -441,18 +419,18 @@
     });
 
     yearlyBtn.addEventListener('click', function() {
-      yearlyBtn.classList.remove('border-gray-300', 'text-gray-700', 'bg-white');
-      yearlyBtn.classList.add('border-transparent', 'text-white', 'bg-blue-500');
+      yearlyBtn.classList.remove('btn-secondary');
+      yearlyBtn.classList.add('btn-primary');
       
-      monthlyBtn.classList.remove('border-transparent', 'text-white', 'bg-blue-500');
-      monthlyBtn.classList.add('border-gray-300', 'text-gray-700', 'bg-white');
+      monthlyBtn.classList.remove('btn-primary');
+      monthlyBtn.classList.add('btn-secondary');
       
       // Update period dropdown for years
       updatePeriodDropdown(false);
       
       // Re-init bar chart for yearly view
       document.getElementById('barChart').remove();
-      const chartContainer = document.querySelector('.h-64:nth-of-type(2)');
+      const chartContainer = document.querySelector('.chart-container:nth-of-type(2)');
       const newCanvas = document.createElement('canvas');
       newCanvas.id = 'barChart';
       chartContainer.appendChild(newCanvas);

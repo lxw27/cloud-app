@@ -24,10 +24,10 @@
         <div class="navbar-right">
           <div class="user-menu-container">
             <div class="user-menu-wrapper">
-              <span class="user-email">user@example.com</span>
+              <span class="user-email" id="userEmailDisplay"></span>
               <button id="userMenuButton" class="user-avatar-btn">
                 <span class="sr-only">Open user menu</span>
-                <i class="fas fa-user-circle user-icon"></i> <!-- Replaced image with icon -->
+                <i class="fas fa-user-circle user-icon"></i>
               </button>
             </div>
             <div id="userMenu" class="dropdown-menu hidden">
@@ -132,33 +132,34 @@
           <i class="fas fa-times"></i>
         </button>
       </div>
+      <!-- Add this inside your subscription modal -->
       <form id="subscriptionForm">
         <input type="hidden" id="subscriptionId" value="">
         <div class="form-group">
-          <label for="subscriptionName" class="form-label">Subscription Name</label>
-          <input type="text" id="subscriptionName" name="subscriptionName" class="form-input" required>
+          <label for="subscriptionName" class="form-label">Service Name</label>
+          <input type="text" id="subscriptionName" class="form-input" required>
         </div>
         <div class="form-group">
-          <label for="subscriptionCost" class="form-label">Cost</label>
+          <label for="subscriptionCost" class="form-label">Monthly Cost</label>
           <div class="input-group">
-            <div class="input-prefix">$</div>
-            <input type="number" step="0.01" id="subscriptionCost" name="subscriptionCost" class="form-input with-prefix" placeholder="0.00" required>
+            <span class="input-prefix">MYR</span>
+            <input type="number" step="0.01" id="subscriptionCost" class="form-input" placeholder="0.00" required>
           </div>
         </div>
         <div class="form-group">
           <label for="billingCycle" class="form-label">Billing Cycle</label>
-          <select id="billingCycle" name="billingCycle" class="form-select">
+          <select id="billingCycle" class="form-select">
             <option value="monthly">Monthly</option>
             <option value="yearly">Yearly</option>
           </select>
         </div>
         <div class="form-group">
           <label for="nextRenewal" class="form-label">Next Renewal Date</label>
-          <input type="date" id="nextRenewal" name="nextRenewal" class="form-input" required>
+          <input type="date" id="nextRenewal" class="form-input" required>
         </div>
         <div class="form-group">
           <label for="subscriptionStatus" class="form-label">Status</label>
-          <select id="subscriptionStatus" name="subscriptionStatus" class="form-select">
+          <select id="subscriptionStatus" class="form-select">
             <option value="active">Active</option>
             <option value="cancelled">Cancelled</option>
           </select>
@@ -187,332 +188,9 @@
     </div>
   </div>
 
-  <script>
-    // Sample data for demonstration
-    let subscriptions = [
-      {
-        id: 1,
-        name: "Netflix",
-        cost: 14.99,
-        billingCycle: "monthly",
-        nextRenewal: "2025-03-25",
-        status: "active"
-      },
-      {
-        id: 2,
-        name: "Spotify",
-        cost: 9.99,
-        billingCycle: "monthly",
-        nextRenewal: "2025-04-05",
-        status: "active"
-      },
-      {
-        id: 3,
-        name: "Amazon Prime",
-        cost: 139.00,
-        billingCycle: "yearly",
-        nextRenewal: "2025-06-15",
-        status: "active"
-      },
-      {
-        id: 4,
-        name: "New York Times",
-        cost: 4.99,
-        billingCycle: "monthly",
-        nextRenewal: "2025-03-30",
-        status: "active"
-      },
-      {
-        id: 5,
-        name: "Hulu",
-        cost: 11.99,
-        billingCycle: "monthly",
-        nextRenewal: "2025-04-02",
-        status: "cancelled"
-      }
-    ];
-
-    // Format date to display
-    function formatDate(dateString) {
-      const options = { year: 'numeric', month: 'short', day: 'numeric' };
-      return new Date(dateString).toLocaleDateString(undefined, options);
-    }
-
-    // Get icon for subscription based on name
-    function getIconForSubscription(name) {
-      const iconMap = {
-        'Netflix': 'film',
-        'Spotify': 'music',
-        'Amazon Prime': 'shipping-fast',
-        'New York Times': 'newspaper',
-        'Hulu': 'tv',
-        'Disney+': 'magic',
-        'Youtube Premium': 'video',
-        'Apple Music': 'apple',
-        'Adobe Creative Cloud': 'palette',
-        'Microsoft 365': 'file-word',
-        'HBO Max': 'film',
-        'PlayStation Plus': 'gamepad'
-      };
-      
-      return iconMap[name] || 'credit-card';
-    }
-
-    // Get lowercase service name for CSS class
-    function getLowerCaseServiceName(name) {
-      return name.toLowerCase().replace(/\s+/g, '-');
-    }
-
-    // Load subscriptions
-    function loadSubscriptions() {
-      const subscriptionsList = document.getElementById('subscriptionsList');
-      subscriptionsList.innerHTML = '';
-      
-      subscriptions.forEach(sub => {
-        const row = document.createElement('tr');
-        
-        const statusClass = sub.status === 'active' ? 'status-active' : 'status-cancelled';
-        
-        row.innerHTML = `
-          <td class="table-cell">
-            <div class="subscription-info">
-              <div class="subscription-icon ${getLowerCaseServiceName(sub.name)}">
-                <i class="fas fa-${getIconForSubscription(sub.name)}"></i>
-              </div>
-              <div class="subscription-name">${sub.name}</div>
-            </div>
-          </td>
-          <td class="table-cell">
-            <div class="cost-primary">$${sub.cost.toFixed(2)}</div>
-            <div class="cost-secondary">${sub.billingCycle === 'yearly' ? '$' + (sub.cost / 12).toFixed(2) + '/mo' : ''}</div>
-          </td>
-          <td class="table-cell">
-            <div class="billing-cycle">${sub.billingCycle.charAt(0).toUpperCase() + sub.billingCycle.slice(1)}</div>
-          </td>
-          <td class="table-cell">
-            <div class="renewal-date">${formatDate(sub.nextRenewal)}</div>
-          </td>
-          <td class="table-cell">
-            <span class="status-badge ${statusClass}">
-              ${sub.status.charAt(0).toUpperCase() + sub.status.slice(1)}
-            </span>
-          </td>
-          <td class="table-cell">
-            <button class="action-btn edit-btn" data-id="${sub.id}">
-              <i class="fas fa-edit"></i>
-            </button>
-            <button class="action-btn delete-btn" data-id="${sub.id}">
-              <i class="fas fa-trash"></i>
-            </button>
-          </td>
-        `;
-        
-        subscriptionsList.appendChild(row);
-      });
-      
-      // Add event listeners to the newly created buttons
-      document.querySelectorAll('.edit-btn').forEach(button => {
-        button.addEventListener('click', function() {
-          const id = parseInt(this.getAttribute('data-id'));
-          editSubscription(id);
-        });
-      });
-      
-      document.querySelectorAll('.delete-btn').forEach(button => {
-        button.addEventListener('click', function() {
-          const id = parseInt(this.getAttribute('data-id'));
-          showDeleteModal(id);
-        });
-      });
-    }
-
-    // Open the modal in add mode
-    function openAddModal() {
-      const modalTitle = document.getElementById('modalTitle');
-      const subscriptionForm = document.getElementById('subscriptionForm');
-      
-      modalTitle.textContent = 'Add New Subscription';
-      document.getElementById('subscriptionId').value = '';
-      subscriptionForm.reset();
-      
-      // Set default date to today
-      const today = new Date().toISOString().split('T')[0];
-      document.getElementById('nextRenewal').value = today;
-      
-      document.getElementById('subscriptionModal').classList.remove('hidden');
-    }
-
-    // Open the modal in edit mode
-    function editSubscription(id) {
-      const subscription = subscriptions.find(sub => sub.id === id);
-      if (subscription) {
-        const modalTitle = document.getElementById('modalTitle');
-        
-        modalTitle.textContent = 'Edit Subscription';
-        document.getElementById('subscriptionId').value = subscription.id;
-        document.getElementById('subscriptionName').value = subscription.name;
-        document.getElementById('subscriptionCost').value = subscription.cost;
-        document.getElementById('billingCycle').value = subscription.billingCycle;
-        document.getElementById('nextRenewal').value = subscription.nextRenewal;
-        document.getElementById('subscriptionStatus').value = subscription.status;
-        
-        document.getElementById('subscriptionModal').classList.remove('hidden');
-      }
-    }
-
-    // Show delete confirmation modal
-    function showDeleteModal(id) {
-      window.currentSubscriptionId = id;
-      document.getElementById('deleteModal').classList.remove('hidden');
-    }
-
-    // Close the subscription modal
-    function closeSubscriptionModal() {
-      document.getElementById('subscriptionModal').classList.add('hidden');
-    }
-    
-    // Close the delete modal
-    function closeDeleteModal() {
-      document.getElementById('deleteModal').classList.add('hidden');
-    }
-
-    // Delete subscription
-    function deleteSubscription() {
-      if (window.currentSubscriptionId) {
-        subscriptions = subscriptions.filter(sub => sub.id !== window.currentSubscriptionId);
-        window.currentSubscriptionId = null;
-        closeDeleteModal();
-        loadSubscriptions();
-        
-        // Update total monthly cost
-        updateMonthlyCost();
-      }
-    }
-    
-    // Update the total monthly cost displayed
-    function updateMonthlyCost() {
-      const totalMonthly = subscriptions.reduce((total, sub) => {
-        if (sub.status === 'active') {
-          return total + (sub.billingCycle === 'monthly' ? sub.cost : sub.cost / 12);
-        }
-        return total;
-      }, 0);
-      
-      // Find the total monthly element and update it
-      const totalMonthlyElement = document.querySelector('.meta-item:nth-child(2)');
-      if (totalMonthlyElement) {
-        totalMonthlyElement.innerHTML = `
-          <i class="fas fa-credit-card meta-icon"></i>
-          Total monthly: $${totalMonthly.toFixed(2)}
-        `;
-      }
-    }
-
-    // Initialize application when DOM is fully loaded
-    document.addEventListener('DOMContentLoaded', function() {
-      // Get references to DOM elements
-      const openAddModalBtn = document.getElementById('openAddModalBtn');
-      const closeModalBtn = document.getElementById('closeModalBtn');
-      const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
-      const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
-      const subscriptionForm = document.getElementById('subscriptionForm');
-      const userMenuButton = document.getElementById('userMenuButton');
-      const subscriptionModal = document.getElementById('subscriptionModal');
-      const deleteModal = document.getElementById('deleteModal');
-      
-      // Add event listeners
-      if (openAddModalBtn) {
-        openAddModalBtn.addEventListener('click', openAddModal);
-      }
-      
-      if (closeModalBtn) {
-        closeModalBtn.addEventListener('click', closeSubscriptionModal);
-      }
-      
-      if (cancelDeleteBtn) {
-        cancelDeleteBtn.addEventListener('click', closeDeleteModal);
-      }
-      
-      if (confirmDeleteBtn) {
-        confirmDeleteBtn.addEventListener('click', deleteSubscription);
-      }
-      
-      // Handle form submission
-      if (subscriptionForm) {
-        subscriptionForm.addEventListener('submit', function(e) {
-          e.preventDefault();
-          
-          const idInput = document.getElementById('subscriptionId');
-          const name = document.getElementById('subscriptionName').value;
-          const cost = parseFloat(document.getElementById('subscriptionCost').value);
-          const billingCycle = document.getElementById('billingCycle').value;
-          const nextRenewal = document.getElementById('nextRenewal').value;
-          const status = document.getElementById('subscriptionStatus').value;
-          
-          const subscriptionData = {
-            name,
-            cost,
-            billingCycle,
-            nextRenewal,
-            status
-          };
-          
-          if (idInput.value) {
-            // Edit existing subscription
-            const id = parseInt(idInput.value);
-            const index = subscriptions.findIndex(sub => sub.id === id);
-            if (index !== -1) {
-              subscriptions[index] = { 
-                ...subscriptions[index], 
-                ...subscriptionData 
-              };
-            }
-          } else {
-            // Add new subscription
-            const newId = subscriptions.length > 0 ? 
-              Math.max(...subscriptions.map(sub => sub.id)) + 1 : 1;
-              
-            subscriptions.push({
-              id: newId,
-              ...subscriptionData
-            });
-          }
-          
-          closeSubscriptionModal();
-          loadSubscriptions();
-          updateMonthlyCost();
-        });
-      }
-      
-      // Toggle user menu
-      if (userMenuButton) {
-        userMenuButton.addEventListener('click', function() {
-          const menu = document.getElementById('userMenu');
-          menu.classList.toggle('hidden');
-        });
-      }
-      
-      // Close modals when clicking outside
-      window.addEventListener('click', function(event) {
-        if (subscriptionModal && event.target === subscriptionModal) {
-          closeSubscriptionModal();
-        }
-        if (deleteModal && event.target === deleteModal) {
-          closeDeleteModal();
-        }
-      });
-      
-      // Initialize the application
-      loadSubscriptions();
-      
-      // Ensure modals are hidden initially
-      if (subscriptionModal) {
-        subscriptionModal.classList.add('hidden');
-      }
-      if (deleteModal) {
-        deleteModal.classList.add('hidden');
-      }
-    });
-  </script>
+  <!-- Add Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="dashboard.js"></script>
 </body>
 </html>
