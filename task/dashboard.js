@@ -1,5 +1,30 @@
 document.addEventListener('DOMContentLoaded', async function() {
-    // Initialize Firebase
+    // DOM elements
+    const elements = {
+        userMenuButton: document.getElementById('userMenuButton'),
+        userMenu: document.getElementById('userMenu'),
+        subscriptionModal: document.getElementById('subscriptionModal'),
+        deleteModal: document.getElementById('deleteModal'),
+        subscriptionForm: document.getElementById('subscriptionForm'),
+        openAddModalBtn: document.getElementById('openAddModalBtn'),
+        closeModalBtn: document.getElementById('closeModalBtn'),
+        cancelDeleteBtn: document.getElementById('cancelDeleteBtn'),
+        confirmDeleteBtn: document.getElementById('confirmDeleteBtn'),
+        searchInput: document.getElementById('search'),
+        statusFilter: document.getElementById('status-filter'),
+        cycleFilter: document.getElementById('cycle-filter'),
+        priceMinInput: document.getElementById('price-min'),
+        priceMaxInput: document.getElementById('price-max'),
+        minPriceValue: document.getElementById('min-price-value'),
+        maxPriceValue: document.getElementById('max-price-value'),
+        sortBySelect: document.getElementById('sort-by'),
+        applyFiltersBtn: document.getElementById('applyFiltersBtn'),
+        applyFiltersMenu: document.getElementById('applyFiltersMenu'),
+        subscriptionsList: document.getElementById('subscriptionsList'),
+        sliderTrack: document.getElementById('slider-track')
+    };
+
+    // Firebase configuration
     const firebaseConfig = {
         apiKey: "AIzaSyDtUAf_vVUdR_sknDbFqdAG3lu6Zo0jp9o",
         authDomain: "cloud-c8d3a.firebaseapp.com",
@@ -8,68 +33,81 @@ document.addEventListener('DOMContentLoaded', async function() {
         messagingSenderId: "768752961591",
         appId: "1:768752961591:web:2cafa172dd2fe5a52fd7b2"
     };
-    
+
+    // Initialize Firebase if haven't
     if (!firebase.apps.length) {
         firebase.initializeApp(firebaseConfig);
     }
+
+    let allSubscriptions = [];
+    let currentSubscriptionId = null;
+
+    // Initialize Auth
+    await initializeAuth();
     
-    // Get DOM elements
-    const userMenuButton = document.getElementById('userMenuButton');
-    const userMenu = document.getElementById('userMenu');
-    const subscriptionModal = document.getElementById('subscriptionModal');
-    const deleteModal = document.getElementById('deleteModal');
-    const subscriptionForm = document.getElementById('subscriptionForm');
-    const openAddModalBtn = document.getElementById('openAddModalBtn');
-    const closeModalBtn = document.getElementById('closeModalBtn');
-    const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
-    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
-    
-    // Set auth persistence (optional)
-    await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-    
-    // Check auth state
-    firebase.auth().onAuthStateChanged(async (user) => {
+    // Setup event listeners
+    setupEventListeners();
+
+    // Initialize Auth
+    async function initializeAuth() {
+        await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+        firebase.auth().onAuthStateChanged(handleAuthStateChange);
+    }
+
+    function handleAuthStateChange(user) {
         if (!user) {
             window.location.href = 'login.html';
             return;
         }
         
-        // Set user email display
         document.getElementById('userEmailDisplay').textContent = user.email;
-        
-        // Load user's subscriptions
-        await loadSubscriptions(user.uid);
-        await updateMonthlyTotal(user.uid);
-    });
-
-    // Event Listeners
-    userMenuButton?.addEventListener('click', toggleUserMenu);
-    openAddModalBtn?.addEventListener('click', openAddModal);
-    closeModalBtn?.addEventListener('click', closeSubscriptionModal);
-    cancelDeleteBtn?.addEventListener('click', closeDeleteModal);
-    confirmDeleteBtn?.addEventListener('click', deleteSubscription);
-
-    // Toggle user menu
-    function toggleUserMenu() {
-        userMenu.classList.toggle('hidden');
+        loadUserData(user.uid);
     }
 
-    // Close user menu when clicking outside
-    document.addEventListener('click', function(event) {
-        if (!userMenuButton.contains(event.target) && !userMenu.contains(event.target)) {
-            userMenu.classList.add('hidden');
-        }
-    });
+    // Load user data (subscriptions)
+    async function loadUserData(userId) {
+        await Promise.all([
+            loadSubscriptions(userId),
+            updateDashboardMetadata(userId)
+        ]);
+    }
 
-    // Logout functionality
-    document.querySelector('.dropdown-item[href="login.html"]').addEventListener('click', function(e) {
-        e.preventDefault();
-        firebase.auth().signOut().then(() => {
-            window.location.href = 'login.html';
+    // Setup event listeners
+    function setupEventListeners() {
+        // User menu
+        elements.userMenuButton?.addEventListener('click', toggleUserMenu);
+        document.addEventListener('click', handleOutsideClick);
+
+        // Modals
+        elements.openAddModalBtn?.addEventListener('click', openAddModal);
+        elements.closeModalBtn?.addEventListener('click', closeSubscriptionModal);
+        elements.cancelDeleteBtn?.addEventListener('click', closeDeleteModal);
+        elements.confirmDeleteBtn?.addEventListener('click', deleteSubscription);
+
+        // Search and filters
+        elements.searchInput?.addEventListener('input', debounce(applyFilters, 300));
+        elements.statusFilter?.addEventListener('change', applyFilters);
+        elements.cycleFilter?.addEventListener('change', applyFilters);
+        elements.sortBySelect?.addEventListener('change', applyFilters);
+
+        // Price range
+        elements.priceMinInput?.addEventListener('input', handlePriceRangeUpdate);
+        elements.priceMaxInput?.addEventListener('input', handlePriceRangeUpdate);
+
+        // Advanced filters
+        elements.applyFiltersBtn?.addEventListener('click', () => {
+            applyFilters();
+            toggleApplyFiltersMenu();
         });
-    });
 
-    // Core Functions
+        // Form submission
+        elements.subscriptionForm?.addEventListener('submit', handleFormSubmission);
+
+        // Logout
+        document.querySelector('.dropdown-item[href="login.html"]')?.addEventListener('click', handleLogout);
+    }
+
+    // Load subscriptions data from database
     async function loadSubscriptions(userId) {
         try {
             const user = firebase.auth().currentUser;
@@ -86,62 +124,43 @@ document.addEventListener('DOMContentLoaded', async function() {
             
             if (!response.ok) throw new Error('Failed to load subscriptions');
             
-            const subscriptions = await response.json();
-            renderSubscriptions(subscriptions);
+            allSubscriptions = await response.json();
+            initPriceRange();
+            applyFilters();
         } catch (error) {
             console.error('Error loading subscriptions:', error);
-            showToast('Failed to load subscriptions', 'error');
+            showMessage('Failed to load subscriptions', 'error');
         }
     }
 
-    async function updateMonthlyTotal(userId) {
-        try {
-            const user = firebase.auth().currentUser;
-            if (!user) return;
-            
-            const token = await user.getIdToken();
-            const response = await fetch(`http://localhost:8000/api/subscriptions/total?user_id=${user.uid}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            
-            if (!response.ok) throw new Error('Failed to load total');
-            
-            const data = await response.json();
-            document.querySelector('.meta-item:nth-child(2)').innerHTML = `
-                <i class="fas fa-credit-card meta-icon"></i>
-                Total monthly: $${data.total.toFixed(2)}
-            `;
-        } catch (error) {
-            console.error('Error loading total:', error);
-        }
-    }
-    
+    // Render obtained subscription data for display
     function renderSubscriptions(subscriptions) {
-        const tbody = document.getElementById('subscriptionsList');
+        const tbody = elements.subscriptionsList;
         tbody.innerHTML = '';
 
         subscriptions.forEach(sub => {
+            const status = capitalizeFirstLetter(sub.status.toLowerCase());
+            const billingCycle = capitalizeFirstLetter(sub.billing_cycle.toLowerCase());
+            
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td class="table-cell">
                     <div class="subscription-info">
-                        <div class="subscription-icon ${getLowerCaseServiceName(sub.service_name)}">
-                            <i class="fas fa-${getIconForSubscription(sub.service_name)}"></i>
+                        <div class="subscription-icon ${getServiceClassName(sub.service_name)}">
+                            <i class="fas fa-${getServiceIcon(sub.service_name)}"></i>
                         </div>
                         <div class="subscription-name">${sub.service_name}</div>
                     </div>
                 </td>
                 <td class="table-cell">
-                    <div class="cost-primary">$${sub.cost.toFixed(2)}</div>
-                    ${sub.billing_cycle === 'Yearly' ? `<div class="cost-secondary">$${(sub.cost/12).toFixed(2)}/mo</div>` : ''}
+                    <div class="cost-primary">MYR ${sub.cost.toFixed(2)}</div>
+                    ${billingCycle === 'Yearly' ? `<div class="cost-secondary">MYR ${(sub.cost/12).toFixed(2)}/mo</div>` : ''}
                 </td>
-                <td class="table-cell">${sub.billing_cycle}</td>
+                <td class="table-cell">${billingCycle}</td>
                 <td class="table-cell">${formatDate(sub.next_renewal_date)}</td>
                 <td class="table-cell">
-                    <span class="status-badge ${sub.status === 'Active' ? 'status-active' : 'status-cancelled'}">
-                        ${sub.status}
+                    <span class="status-badge ${status.toLowerCase() === 'active' ? 'status-active' : 'status-cancelled'}">
+                        ${status}
                     </span>
                 </td>
                 <td class="table-cell">
@@ -156,7 +175,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             tbody.appendChild(row);
         });
 
-        // Add event listeners to action buttons
+        // Add event listeners to dynamically created buttons
         document.querySelectorAll('.edit-btn').forEach(btn => {
             btn.addEventListener('click', () => editSubscription(btn.dataset.id));
         });
@@ -166,21 +185,22 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
     }
 
-    // Modal Functions
+    // Popup window for adding subscription
     function openAddModal() {
         document.getElementById('modalTitle').textContent = 'Add New Subscription';
         document.getElementById('subscriptionId').value = '';
-        subscriptionForm.reset();
+        elements.subscriptionForm.reset();
+        setMinDateForInput();
         document.getElementById('nextRenewal').value = new Date().toISOString().split('T')[0];
-        subscriptionModal.classList.remove('hidden');
+        elements.subscriptionModal.classList.remove('hidden');
     }
 
+    // Function for editing subscription
     async function editSubscription(id) {
         try {
-            const user = firebase.auth().currentUser;
-            if (!user) return;
-            
+            const user = await ensureAuthenticated();
             const token = await user.getIdToken();
+            
             const response = await fetch(`http://localhost:8000/api/subscriptions/${id}`, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -196,36 +216,41 @@ document.addEventListener('DOMContentLoaded', async function() {
             document.getElementById('subscriptionId').value = sub.subscription_id;
             document.getElementById('subscriptionName').value = sub.service_name;
             document.getElementById('subscriptionCost').value = sub.cost;
-            document.getElementById('billingCycle').value = sub.billing_cycle.toLowerCase(); // Ensure case matches
+            document.getElementById('billingCycle').value = sub.billing_cycle.toLowerCase();
+            
+            setMinDateForInput();
             document.getElementById('nextRenewal').value = sub.next_renewal_date.split('T')[0];
-            document.getElementById('subscriptionStatus').value = sub.status.toLowerCase(); // Ensure case matches
-            subscriptionModal.classList.remove('hidden');
+            document.getElementById('subscriptionStatus').value = sub.status.toLowerCase();
+
+            elements.subscriptionModal.classList.remove('hidden');
         } catch (error) {
             console.error('Error loading subscription:', error);
-            showToast('Failed to load subscription', 'error');
+            showMessage('Failed to load subscription', 'error');
         }
     }
 
+    // Popup window for confirming delete subscription
     function showDeleteModal(id) {
-        window.currentSubscriptionId = id;
-        deleteModal.classList.remove('hidden');
+        currentSubscriptionId = id;
+        elements.deleteModal.classList.remove('hidden');
     }
 
+    // Close modals
     function closeSubscriptionModal() {
-        subscriptionModal.classList.add('hidden');
+        elements.subscriptionModal.classList.add('hidden');
     }
 
     function closeDeleteModal() {
-        deleteModal.classList.add('hidden');
+        elements.deleteModal.classList.add('hidden');
     }
 
+    // Function for deleting subscription
     async function deleteSubscription() {
-        const id = window.currentSubscriptionId;
-        if (!id) return;
+        if (!currentSubscriptionId) return;
         
         try {
-            const user = firebase.auth().currentUser;
-            const response = await fetch(`http://localhost:8000/api/subscriptions/${id}`, {
+            const user = await ensureAuthenticated();
+            const response = await fetch(`http://localhost:8000/api/subscriptions/${currentSubscriptionId}`, {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json',
@@ -236,83 +261,278 @@ document.addEventListener('DOMContentLoaded', async function() {
             
             if (!response.ok) throw new Error('Failed to delete subscription');
             
+            updateLocalStorageTimestamp();
             closeDeleteModal();
-            await loadSubscriptions(user.uid);
-            updateMonthlyTotal();
-            showToast('Subscription deleted successfully', 'success');
+            await loadUserData(user.uid);
+            showMessage('Subscription deleted successfully', 'success');
         } catch (error) {
             console.error('Error deleting subscription:', error);
-            showToast('Failed to delete subscription', 'error');
+            showMessage('Failed to delete subscription', 'error');
         }
     }
 
-    // Form Submission
-    subscriptionForm?.addEventListener('submit', async function(e) {
+    // Form handling for adding and editing subscription
+    async function handleFormSubmission(e) {
         e.preventDefault();
         
-        const user = firebase.auth().currentUser;
-        if (!user) return;
-        
+        const user = await ensureAuthenticated();
         const id = document.getElementById('subscriptionId').value;
+        
         const subData = {
             service_name: document.getElementById('subscriptionName').value,
             cost: parseFloat(document.getElementById('subscriptionCost').value),
-            billing_cycle: document.getElementById('billingCycle').value,
+            billing_cycle: capitalizeFirstLetter(document.getElementById('billingCycle').value),
             next_renewal_date: document.getElementById('nextRenewal').value,
-            status: document.getElementById('subscriptionStatus').value,
+            status: capitalizeFirstLetter(document.getElementById('subscriptionStatus').value),
             user_id: user.uid
         };
     
         try {
             const token = await user.getIdToken();
-            let response;
-            if (id) {
-                // Update existing subscription
-                response = await fetch(`http://localhost:8000/api/subscriptions/${id}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify(subData),
-                    credentials: 'include'
-                });
-            } else {
-                // Create new subscription
-                response = await fetch('http://localhost:8000/api/subscriptions', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify(subData),
-                    credentials: 'include'
-                });
-            }
+            const method = id ? 'PUT' : 'POST';
+            const url = id 
+                ? `http://localhost:8000/api/subscriptions/${id}`
+                : 'http://localhost:8000/api/subscriptions';
+            
+            const response = await fetch(url, {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(subData),
+                credentials: 'include'
+            });
             
             if (!response.ok) throw new Error(id ? 'Failed to update subscription' : 'Failed to create subscription');
             
+            updateLocalStorageTimestamp();
             closeSubscriptionModal();
-            await loadSubscriptions(user.uid);
-            updateMonthlyTotal();
-            showToast(`Subscription ${id ? 'updated' : 'added'} successfully`, 'success');
+            await loadUserData(user.uid);
+            showMessage(`Subscription ${id ? 'updated' : 'added'} successfully`, 'success');
         } catch (error) {
             console.error('Error saving subscription:', error);
-            showToast(error.message, 'error');
+            showMessage(error.message, 'error');
         }
-    });
-        
-
-    // Helper Functions
-    function formatDate(dateString) {
-        return new Date(dateString).toLocaleDateString(undefined, { 
-            year: 'numeric', 
-            month: 'short', 
-            day: 'numeric' 
-        });
     }
 
-    function getIconForSubscription(name) {
+    // Functions for filtering and sorting subscriptions
+    function applyFilters() {
+        const searchTerm = elements.searchInput.value.toLowerCase();
+        const statusFilterValue = elements.statusFilter.value;
+        const cycleFilterValue = elements.cycleFilter.value;
+        const minPrice = parseFloat(elements.priceMinInput.value);
+        const maxPrice = parseFloat(elements.priceMaxInput.value);
+        const sortBy = elements.sortBySelect.value;
+        
+        let filteredSubs = allSubscriptions.filter(sub => {
+            // Search filter
+            const matchesSearch = searchTerm 
+                ? sub.service_name.toLowerCase().includes(searchTerm)
+                : true;
+            
+            // Status filter
+            const matchesStatus = statusFilterValue !== 'all' 
+                ? sub.status.toLowerCase() === statusFilterValue
+                : true;
+            
+            // Billing cycle filter
+            const matchesCycle = cycleFilterValue !== 'all' 
+                ? sub.billing_cycle.toLowerCase() === cycleFilterValue
+                : true;
+            
+            // Price range filter
+            const matchesPrice = sub.cost >= minPrice && sub.cost <= maxPrice;
+            
+            return matchesSearch && matchesStatus && matchesCycle && matchesPrice;
+        });
+        
+        // Apply sorting
+        filteredSubs.sort((a, b) => {
+            switch (sortBy) {
+                case 'name-asc': return a.service_name.localeCompare(b.service_name);
+                case 'name-desc': return b.service_name.localeCompare(a.service_name);
+                case 'price-asc': return a.cost - b.cost;
+                case 'price-desc': return b.cost - a.cost;
+                case 'renewal-asc': return new Date(a.next_renewal_date) - new Date(b.next_renewal_date);
+                case 'renewal-desc': return new Date(b.next_renewal_date) - new Date(a.next_renewal_date);
+                default: return 0;
+            }
+        });
+        
+        renderSubscriptions(filteredSubs);
+    }
+
+    // Functions for filtering using price range
+    function initPriceRange() {
+        if (allSubscriptions.length === 0) return;
+
+        const prices = allSubscriptions.map(sub => sub.cost);
+        const minPrice = Math.floor(Math.min(...prices));
+        const maxPrice = Math.ceil(Math.max(...prices));
+        
+        elements.priceMinInput.min = minPrice;
+        elements.priceMinInput.max = maxPrice;
+        elements.priceMinInput.value = minPrice;
+        
+        elements.priceMaxInput.min = minPrice;
+        elements.priceMaxInput.max = maxPrice;
+        elements.priceMaxInput.value = maxPrice;
+        
+        elements.minPriceValue.textContent = minPrice;
+        elements.maxPriceValue.textContent = maxPrice;
+
+        updateSliderTrack();
+    }
+
+    function handlePriceRangeUpdate() {
+        const minVal = parseInt(elements.priceMinInput.value);
+        const maxVal = parseInt(elements.priceMaxInput.value);
+        
+        if (minVal > maxVal) {
+            elements.priceMinInput.value = maxVal;
+        }
+        if (maxVal < minVal) {
+            elements.priceMaxInput.value = minVal;
+        }
+        
+        elements.minPriceValue.textContent = elements.priceMinInput.value;
+        elements.maxPriceValue.textContent = elements.priceMaxInput.value;
+        updateSliderTrack();
+        applyFilters();
+    }
+
+    function updateSliderTrack() {
+        const minVal = parseInt(elements.priceMinInput.value);
+        const maxVal = parseInt(elements.priceMaxInput.value);
+        const minPossible = parseInt(elements.priceMinInput.min);
+        const maxPossible = parseInt(elements.priceMaxInput.max);
+        
+        const leftPercent = ((minVal - minPossible) / (maxPossible - minPossible)) * 100;
+        const rightPercent = 100 - ((maxVal - minPossible) / (maxPossible - minPossible)) * 100;
+        
+        elements.sliderTrack.style.left = `${leftPercent}%`;
+        elements.sliderTrack.style.right = `${rightPercent}%`;
+    }
+
+    // Function to obtain and display dashboard metadata
+    async function updateDashboardMetadata(userId) {
+        try {
+            const user = await ensureAuthenticated();
+            const token = await user.getIdToken();
+            
+            const [subscriptionsResponse, totalResponse] = await Promise.all([
+                fetch(`http://localhost:8000/api/subscriptions`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include'
+                }),
+                fetch(`http://localhost:8000/api/subscriptions/total/${userId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include'
+                })
+            ]);
+            
+            if (!subscriptionsResponse.ok || !totalResponse.ok) {
+                throw new Error('Failed to load dashboard data');
+            }
+            
+            const subscriptions = await subscriptionsResponse.json();
+            const { total } = await totalResponse.json();
+            
+            // Update last updated time
+            let lastUpdated = localStorage.getItem('lastSubscriptionUpdate');
+            if (!lastUpdated && subscriptions.length > 0) {
+                const timestamps = subscriptions.map(sub => {
+                    const dateStr = sub.updated_at || sub.created_at;
+                    return dateStr ? new Date(dateStr) : new Date(0);
+                });
+                lastUpdated = new Date(Math.max(...timestamps));
+            }
+            
+            // Find next renewal
+            let nextRenewal = findNextRenewal(subscriptions);
+            
+            // Update UI
+            updateMetadataUI(lastUpdated, total, nextRenewal);
+        } catch (error) {
+            console.error('Error updating dashboard metadata:', error);
+        }
+    }
+
+    function findNextRenewal(subscriptions) {
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        
+        let nextRenewal = null;
+        const activeSubs = subscriptions.filter(sub => sub.status.toLowerCase() === 'active');
+        
+        activeSubs.forEach(sub => {
+            try {
+                if (!sub.next_renewal_date) return;
+                const renewalDate = new Date(sub.next_renewal_date);
+                renewalDate.setHours(0, 0, 0, 0);
+                
+                if (renewalDate >= now && (!nextRenewal || renewalDate < new Date(nextRenewal.next_renewal_date))) {
+                    nextRenewal = sub;
+                }
+            } catch (e) {
+                console.error('Invalid date for subscription:', sub);
+            }
+        });
+        
+        return nextRenewal;
+    }
+
+    function updateMetadataUI(lastUpdated, totalMonthly, nextRenewal) {
+        const metaItems = document.querySelectorAll('.meta-item');
+        
+        metaItems[0].innerHTML = `
+            <i class="fas fa-calendar-alt meta-icon"></i>
+            Last updated: ${lastUpdated ? formatDate(lastUpdated) : 'Never'}
+        `;
+        
+        metaItems[1].innerHTML = `
+            <i class="fas fa-credit-card meta-icon"></i>
+            Total monthly: MYR ${totalMonthly.toFixed(2)}
+        `;
+        
+        metaItems[2].innerHTML = `
+            <i class="fas fa-clock meta-icon"></i>
+            ${nextRenewal 
+                ? `Next renewal: ${nextRenewal.service_name} (${formatDate(nextRenewal.next_renewal_date, false)})` 
+                : 'No upcoming renewals'}
+        `;
+    }
+
+    // Helper functions 
+    function setMinDateForInput() {
+        const today = new Date();
+        const dd = String(today.getDate()).padStart(2, '0');
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const yyyy = today.getFullYear();
+        document.getElementById('nextRenewal').min = `${yyyy}-${mm}-${dd}`;
+    }
+
+    function formatDate(dateString, includeYear = true) {
+        if (!dateString) return 'Invalid date';
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return 'Invalid date';
+        
+        const day = date.getDate();
+        const month = date.toLocaleString('default', { month: 'short' });
+        if (!includeYear) return `${day} ${month}`;
+        
+        const year = date.getFullYear();
+        return `${day} ${month} ${year}`;
+    }
+
+    function getServiceIcon(name) {
         const iconMap = {
             'Netflix': 'film',
             'Spotify': 'music',
@@ -326,12 +546,58 @@ document.addEventListener('DOMContentLoaded', async function() {
         return iconMap[name] || 'credit-card';
     }
 
-    function getLowerCaseServiceName(name) {
+    function getServiceClassName(name) {
         return name.toLowerCase().replace(/\s+/g, '-').replace(/\+/g, 'plus');
     }
 
-    function showToast(message, type) {
-        // Implement your toast notification system here
-        console.log(`${type}: ${message}`);
+    function capitalizeFirstLetter(string) {
+        return string.charAt(0).toUpperCase() + string.slice(1).toLowerCase();
+    }
+
+    function debounce(func, wait) {
+        let timeout;
+        return function(...args) {
+            const context = this;
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(context, args), wait);
+        };
+    }
+
+    function updateLocalStorageTimestamp() {
+        localStorage.setItem('lastSubscriptionUpdate', new Date().toISOString());
+    }
+
+    async function ensureAuthenticated() {
+        const user = firebase.auth().currentUser;
+        if (!user) {
+            window.location.href = 'login.html';
+            throw new Error('User not authenticated');
+        }
+        return user;
+    }
+
+    function toggleUserMenu() {
+        elements.userMenu.classList.toggle('hidden');
+    }
+
+    function handleOutsideClick(event) {
+        if (!elements.userMenuButton.contains(event.target) && !elements.userMenu.contains(event.target)) {
+            elements.userMenu.classList.add('hidden');
+        }
+    }
+
+    function toggleApplyFiltersMenu() {
+        elements.applyFiltersMenu.classList.toggle('hidden');
+    }
+
+    function handleLogout(e) {
+        e.preventDefault();
+        firebase.auth().signOut().then(() => {
+            window.location.href = 'login.html';
+        });
+    }
+
+    function showMessage(message, type) {
+        console.log(`${type.toUpperCase()}: ${message}`);
     }
 });

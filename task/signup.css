@@ -99,7 +99,7 @@ body {
 .password-strength {
     position: absolute;
     top: 50%;
-    right: 40px; /* Move it left to make room for eye icon */
+    right: 40px; 
     transform: translateY(-50%);
     font-size: 0.75rem;
 }
@@ -180,7 +180,7 @@ body {
 }
 
   
-/* Google Sign-In Button Styles */
+/* Google Sign-In button styles */
 .btn-google {
     display: flex;
     align-items: center;

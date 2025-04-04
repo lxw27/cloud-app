@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="expenses.css">
 </head>
 <body>
-  <!-- Navigation Bar -->
+  <!-- Navigation bar -->
   <nav class="navbar">
     <div class="navbar-container">
       <div class="navbar-left">
@@ -41,9 +41,9 @@
     </div>
   </nav>
 
-  <!-- Main Content -->
+  <!-- Main content -->
   <div class="main-container">
-    <!-- Header Section -->
+    <!-- Header section -->
     <div class="page-header">
       <div class="header-content">
         <h2 class="page-title">Subscription Expenses</h2>
@@ -69,7 +69,7 @@
       </div>
     </div>
 
-    <!-- Time Period Filter -->
+    <!-- Time period filter -->
     <div class="filter-card">
       <div class="filter-container">
         <div class="filter-label">View expenses by:</div>
@@ -90,9 +90,9 @@
       </div>
     </div>
 
-    <!-- Charts Section -->
+    <!-- Charts section -->
     <div class="charts-grid">
-      <!-- Expense Distribution Chart -->
+      <!-- Expense distribution chart -->
       <div class="chart-card">
         <h3 class="chart-title">Expense Distribution</h3>
         <div class="chart-container">
@@ -100,7 +100,7 @@
         </div>
       </div>
       
-      <!-- Expense Trend Chart -->
+      <!-- Expense trend chart -->
       <div class="chart-card">
         <h3 class="chart-title">Expense Trend</h3>
         <div class="chart-container">
@@ -109,7 +109,7 @@
       </div>
     </div>
 
-    <!-- Expense Breakdown Table -->
+    <!-- Expense breakdown table -->
     <div class="table-card">
       <div class="table-header">
         <h3 class="table-title">Monthly Expense Breakdown</h3>
@@ -126,7 +126,7 @@
             </tr>
           </thead>
           <tbody id="expenseBreakdown">
-            <!-- Expense rows will be populated here -->
+            <!-- Expense rows populated here -->
           </tbody>
           <tfoot>
             <tr>
@@ -212,7 +212,7 @@
       { year: "2025", total: 933.64 }
     ];
 
-    // DOM Elements
+    // DOM elements
     const monthlyBtn = document.getElementById('monthlyBtn');
     const yearlyBtn = document.getElementById('yearlyBtn');
     const periodSelect = document.getElementById('periodSelect');
@@ -296,7 +296,7 @@
       return classMap[name] || 'icon-default';
     }
 
-    // Initialize Pie Chart for expense distribution
+    // Initialize pie chart for expense distribution
     function initPieChart() {
       const ctx = document.getElementById('pieChart').getContext('2d');
       
@@ -354,7 +354,7 @@
       });
     }
 
-    // Initialize Bar Chart for expense trends
+    // Initialize bar chart for expense trends
     function initBarChart(isMonthly = true) {
       const ctx = document.getElementById('barChart').getContext('2d');
       

@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="dashboard.css">
 </head>
 <body>
-  <!-- Navigation Bar -->
+  <!-- Navigation bar -->
   <nav class="navbar">
     <div class="container">
       <div class="navbar-content">
@@ -41,24 +41,24 @@
     </div>
   </nav>
 
-  <!-- Main Content -->
+  <!-- Main content -->
   <div class="container main-content">
-    <!-- Header Section -->
+    <!-- Header section -->
     <div class="page-header">
       <div class="page-title-container">
         <h2 class="page-title">Your Subscriptions</h2>
         <div class="page-meta">
           <div class="meta-item">
             <i class="fas fa-calendar-alt meta-icon"></i>
-            Last updated: March 21, 2025
+            Last updated: 
           </div>
           <div class="meta-item">
             <i class="fas fa-credit-card meta-icon"></i>
-            Total monthly: $89.97
+            Total monthly: 
           </div>
           <div class="meta-item">
             <i class="fas fa-clock meta-icon"></i>
-            Next renewal: Netflix (Mar 25)
+            Next renewal: 
           </div>
         </div>
       </div>
@@ -69,7 +69,7 @@
       </div>
     </div>
 
-    <!-- Filtering and Search Section -->
+    <!-- Filtering and search section -->
     <div class="filter-container">
       <div class="filter-wrapper">
         <div class="search-container">
@@ -96,14 +96,44 @@
               <option value="yearly">Yearly</option>
             </select>
           </div>
-          <button type="button" id="applyFiltersBtn" class="btn btn-secondary">
-            <i class="fas fa-filter btn-icon"></i>Apply Filters
-          </button>
+
+          <div class="filter-dropdown">
+            <button type="button" id="applyFiltersBtn" class="btn btn-secondary">
+              <i class="fas fa-filter btn-icon"></i> Advanced Filters
+            </button>
+            <div id="applyFiltersMenu" class="hidden">
+              <div class="dropdown-item sort-dropdown">
+                <label for="sort-by">Sort By</label>
+                <select id="sort-by" class="form-select">
+                  <option value="name-asc">Name (A-Z)</option>
+                  <option value="name-desc">Name (Z-A)</option>
+                  <option value="price-asc">Price (Low-High)</option>
+                  <option value="price-desc">Price (High-Low)</option>
+                  <option value="renewal-asc">Renewal (Soonest)</option>
+                  <option value="renewal-desc">Renewal (Farthest)</option>
+                </select>
+              </div>
+              
+              <div class="dropdown-item price-range-container">
+                <div class="price-range-header">
+                  <label>Price Range</label>
+                  <div class="price-range-values">
+                    MYR <span id="min-price-value">0</span> - MYR <span id="max-price-value">100</span>
+                  </div>
+                </div>
+                <div class="slider-container">
+                  <div class="slider-track" id="slider-track"></div>
+                  <input type="range" id="price-min" min="0" max="100" value="0" step="1" class="slider-range">
+                  <input type="range" id="price-max" min="0" max="100" value="100" step="1" class="slider-range">
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Subscription List -->
+    <!-- Subscription list -->
     <div class="subscription-table-container">
       <table class="subscription-table">
         <thead>
@@ -117,13 +147,13 @@
           </tr>
         </thead>
         <tbody id="subscriptionsList">
-          <!-- Subscription rows will be populated here -->
+          <!-- Subscription rows populated here -->
         </tbody>
       </table>
     </div>
   </div>
 
-  <!-- Add/Edit Subscription Modal -->
+  <!-- Add/Edit subscription modal -->
   <div id="subscriptionModal" class="modal hidden">
     <div class="modal-container">
       <div class="modal-header">
@@ -132,7 +162,7 @@
           <i class="fas fa-times"></i>
         </button>
       </div>
-      <!-- Add this inside your subscription modal -->
+
       <form id="subscriptionForm">
         <input type="hidden" id="subscriptionId" value="">
         <div class="form-group">
@@ -169,7 +199,7 @@
     </div>
   </div>
 
-  <!-- Delete Confirmation Modal -->
+  <!-- Delete confirmation modal -->
   <div id="deleteModal" class="modal hidden">
     <div class="modal-container">
       <div class="delete-modal-content">

@@ -22,9 +22,8 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
     window.location.href = 'dashboard.html';
     
   } catch (error) {
-    // Error handling (keep your existing error display code)
+    // Error handling 
     console.error(error);
-    // ... your existing error display code ...
   } finally {
     loginButton.innerHTML = originalButtonText;
     loginButton.disabled = false;
@@ -39,13 +38,12 @@ document.getElementById('googleSignIn').addEventListener('click', async function
     googleButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in...';
     googleButton.disabled = true;
     
-    // Firebase Google Sign-In
+    // Firebase Google sign-in
     const result = await auth.signInWithPopup(provider);
     window.location.href = 'dashboard.html';
     
   } catch (error) {
     console.error(error);
-    // ... your existing error display code ...
   } finally {
     const googleButton = document.getElementById('googleSignIn');
     googleButton.innerHTML = '<i class="fab fa-google"></i> Continue with Google';

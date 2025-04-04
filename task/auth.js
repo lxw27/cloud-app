@@ -1,5 +1,3 @@
-// auth-utils.js - Common authentication utilities
-
 // Check if user is logged in
 async function checkAuth() {
     try {
@@ -34,7 +32,7 @@ async function checkAuth() {
       localStorage.removeItem('user_id');
       sessionStorage.removeItem('user_id');
       
-      // Redirect to login
+      // Redirect to login page
       window.location.href = 'login.html';
     } catch (error) {
       console.error('Logout failed:', error);
