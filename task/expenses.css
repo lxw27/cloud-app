@@ -8,6 +8,17 @@
   --background-light: #ffffff;
   --background-main: #f9fafb;
   --border-color: #e5e7eb;
+  --success-color: #10b981;
+  --danger-color: #ef4444;
+  --light-gray: #f3f4f6;
+  --gray: #e5e7eb;
+  --dark-gray: #6b7280;
+  --text-dark: #1f2937;
+  --text-light: #9ca3af;
+  --white: #ffffff;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 * {
@@ -17,9 +28,9 @@
 }
 
 body {
-  font-family: 'Roboto', sans-serif;
-  background-color: var(--background-main);
-  color: var(--text-primary);
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: var(--light-gray);
+  color: var(--text-dark);
   min-height: 100vh;
   line-height: 1.5;
 }
@@ -208,8 +219,8 @@ body {
 .page-title {
   font-size: 1.875rem;
   font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 0.5rem;
+  color: var(--text-dark);
+  line-height: 2.25rem;
 }
 
 .header-meta {
@@ -390,7 +401,7 @@ body {
   position: relative;
 }
 
-/* Table card */
+/* Table card - UPDATED TO MATCH DASHBOARD */
 .table-card {
   background-color: var(--background-light);
   border-radius: 0.5rem;
@@ -417,43 +428,44 @@ body {
 }
 
 .data-table {
-  min-width: 100%;
-  border-collapse: collapse;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.data-table thead {
+  background-color: var(--light-gray);
 }
 
 .data-table th {
-  background-color: var(--secondary-color);
   padding: 0.75rem 1.5rem;
   text-align: left;
   font-size: 0.75rem;
   font-weight: 500;
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: var(--dark-gray);
+  background-color: var(--light-gray);
+  border-bottom: 1px solid var(--gray);
 }
 
 .data-table td {
   padding: 1rem 1.5rem;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--gray);
   font-size: 0.875rem;
-  color: var(--text-primary);
+  vertical-align: middle;
 }
 
-.data-table tr:last-child td {
+.data-table th:not(:first-child),
+.data-table td:not(:first-child) {
+  text-align: center;
+}
+
+.data-table tfoot td {
   border-bottom: none;
 }
 
-.totals-label {
-  text-align: right;
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.totals-value {
-  font-weight: 700;
-  color: var(--primary-color);
-}
-
-/* Subscription info styling */
+/* Subscription info - UPDATED TO MATCH DASHBOARD */
 .subscription-info {
   display: flex;
   align-items: center;
@@ -463,13 +475,87 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 0.375rem;
-  margin-right: 0.75rem;
-  color: white;
+  height: 2.5rem;
+  width: 2.5rem;
+  border-radius: 9999px;
+  background-color: #ebf5ff;
+  color: var(--primary-color);
+  margin-right: 1rem;
 }
 
+.subscription-name {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Status badges - UPDATED TO MATCH DASHBOARD */
+.subscription-status {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-align: center;
+  min-width: 80px;
+}
+
+.subscription-status[data-status="active"] {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+}
+
+.subscription-status[data-status="cancelled"] {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+/* Cost cell styling - UPDATED TO MATCH DASHBOARD */
+.cost-cell {
+  font-weight: 500;
+  color: var(--text-primary);
+  text-align: right;
+}
+
+.yearly-cost {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  display: block;
+  margin-top: 0.25rem;
+}
+
+/* Column widths - UPDATED TO MATCH DASHBOARD */
+.subscription-col {
+  width: 35%;
+}
+
+.cycle-col {
+  width: 15%;
+}
+
+.next-col {
+  width: 20%;
+}
+
+.cost-col {
+  width: 30%;
+  text-align: right;
+  padding-right: 2rem;
+}
+
+/* Totals row styling */
+.totals-label {
+  text-align: right;
+  padding-right: 1rem;
+}
+
+.totals-value {
+  text-align: right;
+  padding-right: 2rem;
+}
+
+/* Brand-specific icon colors */
 .icon-netflix {
   background-color: #e50914;
 }
@@ -492,37 +578,6 @@ body {
 
 .icon-default {
   background-color: var(--primary-color);
-}
-
-.subscription-details {
-  display: flex;
-  flex-direction: column;
-}
-
-.subscription-name {
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.subscription-status {
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-}
-
-.billing-cycle, .billing-date {
-  color: var(--text-secondary);
-}
-
-.cost-cell {
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.yearly-cost {
-  display: block;
-  font-size: 0.75rem;
-  font-weight: 400;
-  color: var(--text-secondary);
 }
 
 /* Responsive adjustments */
