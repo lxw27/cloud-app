@@ -414,104 +414,104 @@ async def get_monthly_total(
     return {"total": round(monthly_total, 2)}
 
 # Notification endpoints
-@app.post("/api/send-renewal-notification")
-async def send_renewal_notification(
-    request: RenewalNotificationRequest,
-    background_tasks: BackgroundTasks
-):
-    try:
-        try:
-            user = auth.get_user_by_email(request.email)
-        except auth.UserNotFoundError:
-            raise HTTPException(status_code=404, detail="User not found")
+# @app.post("/api/send-renewal-notification")
+# async def send_renewal_notification(
+#     request: RenewalNotificationRequest,
+#     background_tasks: BackgroundTasks
+# ):
+#     try:
+#         try:
+#             user = auth.get_user_by_email(request.email)
+#         except auth.UserNotFoundError:
+#             raise HTTPException(status_code=404, detail="User not found")
         
-        email_body = generate_notification_email([{
-            "service_name": request.subscription_name,
-            "cost": request.amount,
-            "next_renewal_date": request.renewal_date
-        }])
+#         email_body = generate_notification_email([{
+#             "service_name": request.subscription_name,
+#             "cost": request.amount,
+#             "next_renewal_date": request.renewal_date
+#         }])
         
-        background_tasks.add_task(
-            send_email,
-            to_email=request.email,
-            subject=f"Renewal Reminder: {request.subscription_name}",
-            html_content=email_body
-        )
+#         background_tasks.add_task(
+#             send_email,
+#             to_email=request.email,
+#             subject=f"Renewal Reminder: {request.subscription_name}",
+#             html_content=email_body
+#         )
         
-        db.collection("notifications").add({
-            "user_id": user.uid,
-            "email": request.email,
-            "subscription_name": request.subscription_name,
-            "renewal_date": request.renewal_date,
-            "amount": request.amount,
-            "sent_at": datetime.utcnow().isoformat(),
-            "status": "sent"
-        })
+#         db.collection("notifications").add({
+#             "user_id": user.uid,
+#             "email": request.email,
+#             "subscription_name": request.subscription_name,
+#             "renewal_date": request.renewal_date,
+#             "amount": request.amount,
+#             "sent_at": datetime.utcnow().isoformat(),
+#             "status": "sent"
+#         })
         
-        return {"message": "Notification queued for sending"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+#         return {"message": "Notification queued for sending"}
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/check-renewals")
-async def check_upcoming_renewals(background_tasks: BackgroundTasks):
-    try:
-        tomorrow = datetime.utcnow() + timedelta(days=1)
-        tomorrow_str = tomorrow.strftime("%Y-%m-%d")
+# @app.post("/api/check-renewals")
+# async def check_upcoming_renewals(background_tasks: BackgroundTasks):
+#     try:
+#         tomorrow = datetime.utcnow() + timedelta(days=1)
+#         tomorrow_str = tomorrow.strftime("%Y-%m-%d")
         
-        subs_ref = db.collection("subscriptions") \
-            .where("status", "==", "Active") \
-            .where("next_renewal_date", "==", tomorrow_str)
+#         subs_ref = db.collection("subscriptions") \
+#             .where("status", "==", "Active") \
+#             .where("next_renewal_date", "==", tomorrow_str)
         
-        user_subs = {}
-        for sub in subs_ref.stream():
-            sub_data = sub.to_dict()
-            user_id = sub_data["user_id"]
+#         user_subs = {}
+#         for sub in subs_ref.stream():
+#             sub_data = sub.to_dict()
+#             user_id = sub_data["user_id"]
             
-            if user_id not in user_subs:
-                user_subs[user_id] = []
-            user_subs[user_id].append(sub_data)
+#             if user_id not in user_subs:
+#                 user_subs[user_id] = []
+#             user_subs[user_id].append(sub_data)
         
-        processed = 0
-        for user_id, subscriptions in user_subs.items():
-            try:
-                notified = db.collection("notifications") \
-                    .where("user_id", "==", user_id) \
-                    .where("sent_at", ">=", datetime.utcnow().strftime("%Y-%m-%d")) \
-                    .limit(1).get()
+#         processed = 0
+#         for user_id, subscriptions in user_subs.items():
+#             try:
+#                 notified = db.collection("notifications") \
+#                     .where("user_id", "==", user_id) \
+#                     .where("sent_at", ">=", datetime.utcnow().strftime("%Y-%m-%d")) \
+#                     .limit(1).get()
                 
-                if notified:
-                    continue
+#                 if notified:
+#                     continue
                 
-                background_tasks.add_task(
-                    send_notification_email,
-                    user_id=user_id,
-                    subscriptions=subscriptions
-                )
+#                 background_tasks.add_task(
+#                     send_notification_email,
+#                     user_id=user_id,
+#                     subscriptions=subscriptions
+#                 )
                 
-                processed += 1
+#                 processed += 1
                 
-            except Exception as e:
-                print(f"Error processing user {user_id}: {str(e)}")
-                continue
+#             except Exception as e:
+#                 print(f"Error processing user {user_id}: {str(e)}")
+#                 continue
         
-        return {
-            "message": "Renewal check completed",
-            "users_processed": processed,
-            "subscriptions_processed": sum(len(subs) for subs in user_subs.values())
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+#         return {
+#             "message": "Renewal check completed",
+#             "users_processed": processed,
+#             "subscriptions_processed": sum(len(subs) for subs in user_subs.values())
+#         }
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
 
-# Scheduled jobs
-scheduler = BackgroundScheduler()
-scheduler.add_job(
-    func=lambda: requests.post(f"http://{os.getenv('HOST', 'localhost')}:{os.getenv('PORT', '8000')}/api/check-renewals"),
-    trigger="cron",
-    hour=9,  # 9 AM UTC
-    timezone="UTC"
-)
-scheduler.start()
+# # Scheduled jobs
+# scheduler = BackgroundScheduler()
+# scheduler.add_job(
+#     func=lambda: requests.post(f"http://{os.getenv('HOST', 'localhost')}:{os.getenv('PORT', '8000')}/api/check-renewals"),
+#     trigger="cron",
+#     hour=9,  # 9 AM UTC
+#     timezone="UTC"
+# )
+# scheduler.start()
 
-@app.on_event("shutdown")
-def shutdown_event():
-    scheduler.shutdown()
+# @app.on_event("shutdown")
+# def shutdown_event():
+#     scheduler.shutdown()
