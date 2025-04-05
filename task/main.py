@@ -1,27 +1,49 @@
 from enum import Enum
-from fastapi import FastAPI, HTTPException, Response, Request, Cookie, Depends
-from fastapi.security import HTTPBasicCredentials, HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.middleware.cors import CORSMiddleware
-from firebase_admin import credentials, firestore, auth, initialize_app
-from pydantic import BaseModel
+from datetime import datetime, timedelta
+from typing import Optional, List
+import os
+import jwt
 import secrets
 import uuid
-from typing import Optional, List
-import jwt
-import os
-from datetime import datetime, timedelta
+import smtplib
 import requests
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from apscheduler.schedulers.background import BackgroundScheduler
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, Response, Request, Cookie, Depends, BackgroundTasks
+from fastapi.security import HTTPBasicCredentials, HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from firebase_admin import credentials, firestore, auth, initialize_app
 
-# Initialize Firebase Admin SDK with credentials
-firebase_cred = credentials.Certificate("cloud-c8d3a-firebase-adminsdk-fbsvc-f03dced741.json")
+# Configuration
+load_dotenv()
+
+# Firebase
+FIREBASE_CRED_PATH = os.getenv("FIREBASE_CREDENTIAL_PATH", "cloud-c8d3a-firebase-adminsdk-fbsvc-f03dced741.json")
+FIREBASE_API_KEY = os.getenv("FIREBASE_API_KEY")
+firebase_cred = credentials.Certificate(FIREBASE_CRED_PATH)
 firebase_app = initialize_app(firebase_cred)
 db = firestore.client()
 
-# Create FastAPI app
+# JWT
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-fallback-secret-key")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+# Email
+SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
+SMTP_USER = os.getenv("SMTP_USER")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+EMAIL_FROM = os.getenv("EMAIL_FROM", "noreply@subtrack.com")
+
+# FastAPI setup
 app = FastAPI()
 security = HTTPBearer()
 
-# Configure CORS
+# CORS configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://127.0.0.1:3000", "http://localhost:3000", "http://localhost"],
@@ -29,12 +51,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Security configuration
-SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "your-fallback-secret-key")
-ALGORITHM = "HS256"
-FIREBASE_API_KEY = os.environ.get("FIREBASE_API_KEY", "your-firebase-api-key")
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 # Helper functions
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
@@ -51,33 +67,26 @@ def set_auth_cookie(response: Response, token: str, expires: timedelta) -> None:
         max_age=expires.total_seconds(),
         expires=expires.total_seconds(),
         samesite="lax",
-        secure=False  # Set to True if production in HTTPS
+        secure=os.getenv("ENVIRONMENT") == "production"
     )
 
-async def verify_firebase_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    try:
-        return auth.verify_id_token(credentials.credentials)
-    except Exception as e:
-        raise HTTPException(status_code=401, detail="Invalid authentication credentials")
-
-async def get_current_user(token: str = Cookie(None)):
+async def get_current_user(token: str = Cookie(None)) -> dict:
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("sub")
-        if not user_id:
-            raise HTTPException(status_code=401, detail="Invalid credentials")
-        
-        user = get_user_data(user_id)
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-        return user
-    except jwt.JWTError:
+        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-def get_user_data(user_id: str):
+async def verify_firebase_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
+    try:
+        return auth.verify_id_token(credentials.credentials)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid authentication credentials")
+
+def get_user_data(user_id: str) -> Optional[dict]:
     user_doc = db.collection('users').document(user_id).get()
     return user_doc.to_dict() if user_doc.exists else None
 
@@ -93,6 +102,35 @@ def verify_firebase_password(email: str, password: str) -> dict:
             detail=error_data.get("error", {}).get("message", "Invalid credentials")
         )
     return response.json()
+
+async def send_notification_email(user_id: str, subscriptions: list) -> bool:
+    try:
+        user = auth.get_user(user_id)
+        if not user.email:
+            return False
+        
+        email_body = generate_notification_email(subscriptions)
+        success = send_email(
+            to_email=user.email,
+            subject=f"Renewal Reminder: {len(subscriptions)} subscription{'s' if len(subscriptions) > 1 else ''}",
+            html_content=email_body
+        )
+        
+        if success:
+            for sub in subscriptions:
+                db.collection("notifications").add({
+                    "user_id": user_id,
+                    "email": user.email,
+                    "subscription_name": sub["service_name"],
+                    "renewal_date": sub["next_renewal_date"],
+                    "amount": sub["cost"],
+                    "sent_at": datetime.utcnow().isoformat(),
+                    "status": "sent"
+                })
+        return success
+    except Exception as e:
+        print(f"Error sending notification to {user_id}: {str(e)}")
+        return False
 
 # Models
 class UserLogin(BaseModel):
@@ -135,6 +173,57 @@ class SubscriptionResponse(Subscription):
     created_at: datetime
     updated_at: datetime
 
+class RenewalNotificationRequest(BaseModel):
+    email: str 
+    subscription_name: str 
+    renewal_date: str 
+    amount: float
+
+# Email functions
+def generate_notification_email(subscriptions: list) -> str:
+    """Generate HTML email content for subscription renewals"""
+    subscriptions_html = "\n".join(
+        f"<li><strong>{sub['service_name']}</strong> - ${sub['cost']:.2f} (renews on {sub['next_renewal_date']})</li>"
+        for sub in subscriptions
+    )
+    
+    total_amount = sum(sub['cost'] for sub in subscriptions)
+    
+    return f"""
+    <html>
+    <body>
+        <p>Hello,</p>
+        <p>This is a reminder about your upcoming subscription renewals:</p>
+        <ul>
+            {subscriptions_html}
+        </ul>
+        <p><strong>Total amount: ${total_amount:.2f}</strong></p>
+        <p>Thank you for using SubTrack!</p>
+    </body>
+    </html>
+    """
+
+def send_email(to_email: str, subject: str, html_content: str) -> bool:
+    """Send email using SMTP"""
+    if not all([SMTP_SERVER, SMTP_PORT, SMTP_USER, SMTP_PASSWORD]):
+        raise ValueError("SMTP configuration is incomplete")
+    
+    msg = MIMEMultipart()
+    msg['From'] = EMAIL_FROM
+    msg['To'] = to_email
+    msg['Subject'] = subject
+    msg.attach(MIMEText(html_content, 'html'))
+    
+    try:
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.send_message(msg)
+            return True
+    except Exception as e:
+        print(f"Error sending email: {str(e)}")
+        return False
+
 # Authentication endpoints
 @app.get("/")
 def read_root():
@@ -143,11 +232,9 @@ def read_root():
 @app.post("/auth/login")
 async def login(user_data: UserLogin, response: Response):
     try:
-        # Verify user credentials with Firebase
         auth_result = verify_firebase_password(user_data.email, user_data.password)
         user = auth.get_user_by_email(user_data.email)
 
-        # Create access token
         expires = timedelta(days=30 if user_data.remember_me else 1)
         access_token = create_access_token(
             data={"sub": user.uid, "email": user_data.email},
@@ -169,7 +256,6 @@ async def google_login(request: GoogleLoginRequest, response: Response):
         uid = decoded_token['uid']
         
         if not get_user_data(uid):
-            # Create new user record
             user_data = {
                 'uid': uid,
                 'email': decoded_token.get('email'),
@@ -179,7 +265,6 @@ async def google_login(request: GoogleLoginRequest, response: Response):
             }
             db.collection('users').document(uid).set(user_data)
         
-        # Create and set access token
         expires = timedelta(days=30)
         access_token = create_access_token(
             data={"sub": uid, "email": decoded_token.get('email')},
@@ -327,3 +412,106 @@ async def get_monthly_total(
         monthly_total += sub['cost'] / (12 if sub['billing_cycle'] == 'Yearly' else 1)
             
     return {"total": round(monthly_total, 2)}
+
+# Notification endpoints
+@app.post("/api/send-renewal-notification")
+async def send_renewal_notification(
+    request: RenewalNotificationRequest,
+    background_tasks: BackgroundTasks
+):
+    try:
+        try:
+            user = auth.get_user_by_email(request.email)
+        except auth.UserNotFoundError:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        email_body = generate_notification_email([{
+            "service_name": request.subscription_name,
+            "cost": request.amount,
+            "next_renewal_date": request.renewal_date
+        }])
+        
+        background_tasks.add_task(
+            send_email,
+            to_email=request.email,
+            subject=f"Renewal Reminder: {request.subscription_name}",
+            html_content=email_body
+        )
+        
+        db.collection("notifications").add({
+            "user_id": user.uid,
+            "email": request.email,
+            "subscription_name": request.subscription_name,
+            "renewal_date": request.renewal_date,
+            "amount": request.amount,
+            "sent_at": datetime.utcnow().isoformat(),
+            "status": "sent"
+        })
+        
+        return {"message": "Notification queued for sending"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/check-renewals")
+async def check_upcoming_renewals(background_tasks: BackgroundTasks):
+    try:
+        tomorrow = datetime.utcnow() + timedelta(days=1)
+        tomorrow_str = tomorrow.strftime("%Y-%m-%d")
+        
+        subs_ref = db.collection("subscriptions") \
+            .where("status", "==", "Active") \
+            .where("next_renewal_date", "==", tomorrow_str)
+        
+        user_subs = {}
+        for sub in subs_ref.stream():
+            sub_data = sub.to_dict()
+            user_id = sub_data["user_id"]
+            
+            if user_id not in user_subs:
+                user_subs[user_id] = []
+            user_subs[user_id].append(sub_data)
+        
+        processed = 0
+        for user_id, subscriptions in user_subs.items():
+            try:
+                notified = db.collection("notifications") \
+                    .where("user_id", "==", user_id) \
+                    .where("sent_at", ">=", datetime.utcnow().strftime("%Y-%m-%d")) \
+                    .limit(1).get()
+                
+                if notified:
+                    continue
+                
+                background_tasks.add_task(
+                    send_notification_email,
+                    user_id=user_id,
+                    subscriptions=subscriptions
+                )
+                
+                processed += 1
+                
+            except Exception as e:
+                print(f"Error processing user {user_id}: {str(e)}")
+                continue
+        
+        return {
+            "message": "Renewal check completed",
+            "users_processed": processed,
+            "subscriptions_processed": sum(len(subs) for subs in user_subs.values())
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Scheduled jobs
+scheduler = BackgroundScheduler()
+scheduler.add_job(
+    func=lambda: requests.post(f"http://{os.getenv('HOST', 'localhost')}:{os.getenv('PORT', '8000')}/api/check-renewals"),
+    trigger="cron",
+    hour=9,  # 9 AM UTC
+    timezone="UTC"
+)
+scheduler.start()
+
+@app.on_event("shutdown")
+def shutdown_event():
+    scheduler.shutdown()

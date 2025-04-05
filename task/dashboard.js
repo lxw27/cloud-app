@@ -153,8 +153,8 @@ document.addEventListener('DOMContentLoaded', async function() {
                     </div>
                 </td>
                 <td class="table-cell">
-                    <div class="cost-primary">MYR ${sub.cost.toFixed(2)}</div>
-                    ${billingCycle === 'Yearly' ? `<div class="cost-secondary">MYR ${(sub.cost/12).toFixed(2)}/mo</div>` : ''}
+                    <div class="cost-primary">RM ${sub.cost.toFixed(2)}</div>
+                    ${billingCycle === 'Yearly' ? `<div class="cost-secondary">RM ${(sub.cost/12).toFixed(2)}/mo</div>` : ''}
                 </td>
                 <td class="table-cell">${billingCycle}</td>
                 <td class="table-cell">${formatDate(sub.next_renewal_date)}</td>
@@ -499,7 +499,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         metaItems[1].innerHTML = `
             <i class="fas fa-credit-card meta-icon"></i>
-            Total monthly: MYR ${totalMonthly.toFixed(2)}
+            Total monthly: RM ${totalMonthly.toFixed(2)}
         `;
         
         metaItems[2].innerHTML = `
@@ -541,7 +541,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             'Hulu': 'tv',
             'YouTube': 'video',
             'Disney+': 'magic',
-            'Apple Music': 'music'
+            'Apple Music': 'music',
+            'Adobe Creative Cloud': 'palette',
+            'Microsoft 365': 'file-word',
+            'HBO Max': 'film',
+            'PlayStation Plus': 'gamepad',
+            'Youtube Premium': 'video' 
         };
         return iconMap[name] || 'credit-card';
     }

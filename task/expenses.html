@@ -22,16 +22,15 @@
       </div>
       <div class="navbar-right">
         <div class="user-menu-container">
-          <div class="user-info">
-            <span class="user-name">John Doe</span>
+          <div class="user-menu-wrapper">
+            <span class="user-email" id="userEmailDisplay"></span>
             <button id="userMenuButton" class="user-avatar-btn">
               <span class="sr-only">Open user menu</span>
-              <img class="user-avatar" src="https://ui-avatars.com/api/?name=John+Doe&background=3b82f6&color=fff" alt="User avatar">
+              <i class="fas fa-user-circle user-icon"></i>
             </button>
           </div>
           <div id="userMenu" class="dropdown-menu hidden">
-            <a href="#" class="dropdown-item">Your Profile</a>
-            <a href="#" class="dropdown-item">Settings</a>
+            <!-- <a href="#" class="dropdown-item">Your Profile</a> -->
             <a href="login.html" class="dropdown-item">Sign out</a>
           </div>
         </div>
@@ -52,18 +51,18 @@
           </div>
           <div class="meta-item">
             <i class="fas fa-chart-pie meta-icon"></i>
-            Monthly spending: $89.97
+            <!-- Monthly spending metadata -->
           </div>
           <div class="meta-item">
             <i class="fas fa-chart-line meta-icon"></i>
-            Yearly projection: $933.64
+            <!-- Yearly projection metadata -->
           </div>
         </div>
       </div>
       <div class="header-actions">
-        <a href="reports.html" class="btn btn-primary">
+        <button class="btn btn-primary" id="generateReportBtn">
           <i class="fas fa-file-alt btn-icon"></i> Generate Report
-        </a>
+        </button>
       </div>
     </div>
 
@@ -128,11 +127,11 @@
           <tfoot>
             <tr>
               <td colspan="3" class="totals-label">Total Monthly:</td>
-              <td class="totals-value">$89.97</td>
+              <td class="totals-value"></td>
             </tr>
             <tr>
               <td colspan="3" class="totals-label">Yearly Projection:</td>
-              <td class="totals-value">$933.64</td>
+              <td class="totals-value"></td>
             </tr>
           </tfoot>
         </table>
@@ -141,6 +140,10 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <!-- Add Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
   <script src="expenses.js"></script>
 </body>
 </html>

@@ -109,43 +109,67 @@ body {
   margin-left: 1rem;
 }
 
-.user-info {
+.user-menu-wrapper {
   display: flex;
   align-items: center;
 }
 
-.user-name {
+.user-email {
   font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-primary);
-  margin-right: 0.5rem;
-  display: none;
+  color: var(--text-dark);
+  margin-right: 0.75rem;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-@media (min-width: 768px) {
-  .user-name {
-    display: block;
-  }
+.user-icon {
+  font-size: 1.75rem;
+  color: var(--primary-color);
 }
 
 .user-avatar-btn {
-  background-color: var(--background-light);
+  background-color: var(--white);
   border-radius: 9999px;
   display: flex;
-  padding: 0;
   border: none;
   cursor: pointer;
-  outline: none;
 }
 
-.user-avatar-btn:focus {
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+.dropdown-menu {
+  position: absolute;
+  right: 0;
+  z-index: 10;
+  margin-top: 0.5rem;
+  width: 10rem;
+  border-radius: 0.375rem;
+  background-color: var(--white);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--gray);
 }
 
-.user-avatar {
-  height: 2rem;
-  width: 2rem;
-  border-radius: 9999px;
+.dropdown-item {
+  display: block;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  color: var(--text-dark);
+  text-decoration: none;
+}
+
+@media (max-width: 768px) {
+  .user-email {
+    max-width: 120px;
+  }
+}
+
+@media (max-width: 640px) {
+  .user-email {
+    display: none;
+  }
+  .user-icon {
+    font-size: 1.5rem;
+  }
 }
 
 .sr-only {
@@ -160,43 +184,18 @@ body {
   border-width: 0;
 }
 
-.dropdown-menu {
-  position: absolute;
-  right: 0;
-  margin-top: 0.5rem;
-  width: 12rem;
-  background-color: var(--background-light);
-  border-radius: 0.375rem;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  z-index: 10;
-  border: 1px solid var(--border-color);
-  overflow: hidden;
-}
-
-.dropdown-menu.hidden {
+.hidden {
   display: none;
 }
 
-.dropdown-item {
-  display: block;
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  color: var(--text-primary);
-  text-decoration: none;
-}
-
-.dropdown-item:hover {
-  background-color: var(--secondary-color);
-}
-
-/* Main container */
+/* Main container styles */
 .main-container {
   max-width: 1280px;
   margin: 0 auto;
   padding: 1.5rem 1rem;
 }
 
-/* Page header */
+/* Page header styles */
 .page-header {
   display: flex;
   flex-direction: column;
@@ -261,7 +260,7 @@ body {
   }
 }
 
-/* Buttons */
+/* Buttons styles */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -308,7 +307,7 @@ body {
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
 }
 
-/* Filter card */
+/* Filter card styles */
 .filter-card {
   background-color: var(--background-light);
   border-radius: 0.5rem;
@@ -367,7 +366,7 @@ body {
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
 }
 
-/* Charts grid */
+/* Charts grid styles */
 .charts-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -381,7 +380,7 @@ body {
   }
 }
 
-/* Chart card */
+/* Chart card styles */
 .chart-card {
   background-color: var(--background-light);
   border-radius: 0.5rem;
@@ -401,7 +400,7 @@ body {
   position: relative;
 }
 
-/* Table card - UPDATED TO MATCH DASHBOARD */
+/* Table card styles */
 .table-card {
   background-color: var(--background-light);
   border-radius: 0.5rem;
@@ -465,7 +464,11 @@ body {
   border-bottom: none;
 }
 
-/* Subscription info - UPDATED TO MATCH DASHBOARD */
+.data-table tfoot td:first-child {
+  padding-right: 5rem;
+}
+
+/* Subscription info styles */
 .subscription-info {
   display: flex;
   align-items: center;
@@ -490,7 +493,7 @@ body {
   text-overflow: ellipsis;
 }
 
-/* Status badges - UPDATED TO MATCH DASHBOARD */
+/* Status badges styles */
 .subscription-status {
   display: inline-block;
   padding: 0.25rem 0.75rem;
@@ -511,7 +514,7 @@ body {
   color: #ef4444;
 }
 
-/* Cost cell styling - UPDATED TO MATCH DASHBOARD */
+/* Cost cell styles */
 .cost-cell {
   font-weight: 500;
   color: var(--text-primary);
@@ -525,7 +528,7 @@ body {
   margin-top: 0.25rem;
 }
 
-/* Column widths - UPDATED TO MATCH DASHBOARD */
+/* Column widths styles */
 .subscription-col {
   width: 35%;
 }
@@ -544,7 +547,7 @@ body {
   padding-right: 2rem;
 }
 
-/* Totals row styling */
+/* Totals row styles */
 .totals-label {
   text-align: right;
   padding-right: 1rem;
@@ -555,7 +558,7 @@ body {
   padding-right: 2rem;
 }
 
-/* Brand-specific icon colors */
+/* Brand-specific icon colors styles */
 .icon-netflix {
   background-color: #e50914;
 }
@@ -601,7 +604,7 @@ body {
   }
 }
 
-/* Pagination */
+/* Pagination styles */
 .pagination {
   display: flex;
   justify-content: flex-end;
@@ -677,7 +680,7 @@ body {
   100% { transform: rotate(360deg); }
 }
 
-/* Tooltips */
+/* Tooltips styles */
 .tooltip {
   position: relative;
   display: inline-block;
@@ -720,4 +723,12 @@ body {
   border-width: 5px;
   border-style: solid;
   border-color: var(--text-primary) transparent transparent transparent;
+}
+
+.modal {
+  display: flex;
+}
+
+.modal.hidden {
+  display: none;
 }
