@@ -1,3 +1,19 @@
 {
-    "routes": [{ "handle": "filesystem" }, { "src": "/.*", "dest": "task/login.html" }]
+  "version": 2,
+  "public": false,
+  "rewrites": [
+    { "source": "/", "destination": "/login.html" },
+    { "source": "/(.*)", "destination": "/$1" }
+  ],
+  "routes": [
+    {
+      "src": "/.*\\.(html|css|js|json|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)",
+      "headers": { "cache-control": "public, max-age=31536000, immutable" },
+      "continue": true
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/login.html"
+    }
+  ]
 }
