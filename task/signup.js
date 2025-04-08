@@ -1,28 +1,72 @@
 const auth = firebase.auth();
 const provider = new firebase.auth.GoogleAuthProvider();
 
+// Configuration
+const ACCESS_TOKEN_EXPIRE_MINUTES = 30;
+const REFRESH_TOKEN_EXPIRE_DAYS = 7;
+
+// Enhanced password validation (moved from Python)
 function validatePassword(password, email) {
   // Check minimum length
   if (password.length < 6) {
     return { valid: false, message: "Password must be at least 6 characters long" };
   }
-
+  
   // Check for at least one alphabet character
   if (!/[a-zA-Z]/.test(password)) {
     return { valid: false, message: "Password must contain at least one letter" };
   }
-
+  
   // Check for at least one number
   if (!/[0-9]/.test(password)) {
     return { valid: false, message: "Password must contain at least one number" };
   }
-
+  
   // Check for at least one special character
   if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
     return { valid: false, message: "Password must contain at least one special character" };
   }
-
+  
+  // Check if password contains email or username parts
+  const emailParts = email.split('@')[0].split('.');
+  for (const part of emailParts) {
+    if (part.toLowerCase().includes(password.toLowerCase()) && part.length > 3) {
+      return { valid: false, message: "Password should not contain parts of your email" };
+    }
+  }
+  
   return { valid: true, message: "Password is valid" };
+}
+
+// Token management functions (client-side versions)
+function setAuthCookies(accessToken, refreshToken, expires) {
+  const secure = window.location.protocol === 'https:';
+  const cookiePrefix = secure ? "__Host-" : "";
+  
+  // Set access token cookie
+  document.cookie = `${cookiePrefix}access_token=${accessToken}; ` +
+    `HttpOnly; Secure=${secure}; SameSite=Strict; ` +
+    `Max-Age=${expires}; Path=/`;
+  
+  // Set refresh token cookie
+  document.cookie = `${cookiePrefix}refresh_token=${refreshToken}; ` +
+    `HttpOnly; Secure=${secure}; SameSite=Strict; ` +
+    `Max-Age=${REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600}; Path=/auth/refresh`;
+}
+
+function clearAuthCookies() {
+  const secure = window.location.protocol === 'https:';
+  const cookiePrefix = secure ? "__Host-" : "";
+  
+  // Clear access token
+  document.cookie = `${cookiePrefix}access_token=; ` +
+    `HttpOnly; Secure=${secure}; SameSite=Strict; ` +
+    `Max-Age=0; Path=/`;
+  
+  // Clear refresh token
+  document.cookie = `${cookiePrefix}refresh_token=; ` +
+    `HttpOnly; Secure=${secure}; SameSite=Strict; ` +
+    `Max-Age=0; Path=/auth/refresh`;
 }
 
 // Update the password strength meter logic
@@ -30,6 +74,7 @@ document.getElementById('password').addEventListener('input', function() {
   const password = this.value;
   const strengthMeter = document.getElementById('passwordStrength');
   const strengthTextContainer = document.getElementById('passwordStrengthText');
+  const email = document.getElementById('email').value;
 
   if (!password) {
     strengthMeter.style.width = '0%';
@@ -52,18 +97,19 @@ document.getElementById('password').addEventListener('input', function() {
     requirementsElement.className = 'password-requirements';
     document.querySelector('.password-strength-container').after(requirementsElement);
     
-    // Add requirements list
+    // Add requirements list (updated to match Python validation)
     requirementsElement.innerHTML = `
-      <div class="requirement" id="req-length"><i class="fas fa-circle"></i> At least 8 characters</div>
+      <div class="requirement" id="req-length"><i class="fas fa-circle"></i> At least 6 characters</div>
       <div class="requirement" id="req-letter"><i class="fas fa-circle"></i> Contains letters</div>
       <div class="requirement" id="req-number"><i class="fas fa-circle"></i> Contains numbers</div>
       <div class="requirement" id="req-special"><i class="fas fa-circle"></i> Contains special characters</div>
+      <div class="requirement" id="req-email"><i class="fas fa-circle"></i> Not contain email parts</div>
     `;
   } else {
     requirementsElement.style.display = 'block';
   }
 
-  // Simple strength calculation
+  // Strength calculation based on Python validation
   let strength = 0;
   let strengthText = '';
   
@@ -75,12 +121,24 @@ document.getElementById('password').addEventListener('input', function() {
   else if (hasAcceptableLength) strength += 15;
   
   // Update requirement indicator
-  updateRequirement('req-length', hasMinLength);
+  updateRequirement('req-length', hasAcceptableLength);
   
   // Character variety
   const hasLetter = /[a-zA-Z]/.test(password);
   const hasNumber = /[0-9]/.test(password);
   const hasSpecial = /[^A-Za-z0-9]/.test(password);
+  
+  // Check for email parts in password
+  let hasNoEmailParts = true;
+  if (email) {
+    const emailParts = email.split('@')[0].split('.');
+    for (const part of emailParts) {
+      if (part.length > 3 && password.toLowerCase().includes(part.toLowerCase())) {
+        hasNoEmailParts = false;
+        break;
+      }
+    }
+  }
   
   if (hasLetter) strength += 25;
   if (hasNumber) strength += 25;
@@ -90,6 +148,7 @@ document.getElementById('password').addEventListener('input', function() {
   updateRequirement('req-letter', hasLetter);
   updateRequirement('req-number', hasNumber);
   updateRequirement('req-special', hasSpecial);
+  updateRequirement('req-email', hasNoEmailParts);
   
   // Ensure strength is between 0 and 100
   strength = Math.max(0, Math.min(100, strength));
@@ -166,7 +225,7 @@ document.getElementById('signupForm').addEventListener('submit', async function(
         return;
     }
 
-    // Enhanced password validation
+    // Enhanced password validation using the same rules as Python backend
     const passwordValidation = validatePassword(password, email);
     if (!passwordValidation.valid) {
       showErrorMessage(passwordValidation.message);
@@ -178,17 +237,48 @@ document.getElementById('signupForm').addEventListener('submit', async function(
       signupButton.innerHTML = '<span class="button-loading"><i class="fas fa-spinner fa-spin"></i> Signing up...</span>';
       signupButton.disabled = true;
       
-      await auth.createUserWithEmailAndPassword(email, password)
-      .then((userCredential) => {
-        const user = userCredential.user;
+      // Create user with Firebase Auth
+      const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+      const user = userCredential.user;
 
-        return user.sendEmailVerification();
-      })
+      // Send verification email
+      await user.sendEmailVerification();
 
+      // Optional: Send user data to backend
+      try {
+        const response = await fetch('/auth/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: email,
+            password: password
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to register user in backend');
+        }
+      } catch (backendError) {
+        console.error('Backend registration error:', backendError);
+        // Continue with frontend flow even if backend registration fails
+      }
+
+      // Hide form and show verification message
       document.getElementById('signupForm').style.display = 'none';
       verificationMessage.style.display = 'block';
     } catch (error) {
-      showErrorMessage(`Registration error: ${error.message}`);
+      let errorMessage = `Registration error: ${error.message}`;
+      
+      // Handle specific Firebase errors
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = "Email already exists. Please use a different email or login.";
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = "Password is too weak. Please use a stronger password.";
+      }
+      
+      showErrorMessage(errorMessage);
     } finally {
       signupButton.innerHTML = originalButtonText;
       signupButton.disabled = false;
@@ -268,7 +358,7 @@ document.getElementById('googleSignUp')?.addEventListener('click', async functio
     const user = result.user;
     
     // Send Google ID token to backend for verification
-    const response = await fetch('http://localhost:8000/auth/google', {
+    const response = await fetch('/auth/google', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -283,6 +373,14 @@ document.getElementById('googleSignUp')?.addEventListener('click', async functio
       const errorData = await response.json();
       throw new Error(errorData.detail || 'Google sign up failed');
     }
+    
+    // Get tokens from response and set cookies
+    const data = await response.json();
+    setAuthCookies(
+      data.access_token,
+      data.refresh_token,
+      ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    );
     
     // Show success message before redirect to dashboard
     const successMessage = document.createElement('div');

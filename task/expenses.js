@@ -14,6 +14,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         firebase.initializeApp(firebaseConfig);
     }
 
+    const db = firebase.firestore();
+
     // DOM elements
     const elements = {
         monthlyBtn: document.getElementById('monthlyBtn'),
@@ -227,21 +229,20 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Load subscriptions
     async function loadSubscriptions(userId) {
         try {
-            const user = firebase.auth().currentUser;
-            if (!user) return;
-            
-            const token = await user.getIdToken();
-            const response = await fetch(`http://localhost:8000/api/subscriptions`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                credentials: 'include'
+            const querySnapshot = await db.collection('subscriptions')
+            .where('user_id', '==', userId)
+            .get();
+
+            state.allSubscriptions = querySnapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    ...data,
+                    subscription_id: doc.id,
+                    next_renewal_date: data.next_renewal_date?.toDate ? data.next_renewal_date.toDate().toISOString() : data.next_renewal_date,
+                    created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : data.created_at,
+                    updated_at: data.updated_at?.toDate ? data.updated_at.toDate().toISOString() : data.updated_at 
+                };
             });
-            
-            if (!response.ok) throw new Error('Failed to load subscriptions');
-            
-            state.allSubscriptions = await response.json();
         } catch (error) {
             console.error('Error loading subscriptions:', error);
             throw error;

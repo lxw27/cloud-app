@@ -39,8 +39,19 @@ document.addEventListener('DOMContentLoaded', async function() {
         firebase.initializeApp(firebaseConfig);
     }
 
+    const db = firebase.firestore();
     let allSubscriptions = [];
     let currentSubscriptionId = null;
+
+    const BillingCycle = {
+        MONTHLY: "Monthly",
+        YEARLY: "Yearly"
+    };
+
+    const Status = {
+        ACTIVE: "Active",
+        CANCELLED: "Cancelled"
+    };
 
     // Initialize Auth
     await initializeAuth();
@@ -113,18 +124,20 @@ document.addEventListener('DOMContentLoaded', async function() {
             const user = firebase.auth().currentUser;
             if (!user) return;
             
-            const token = await user.getIdToken();
-            const response = await fetch(`http://localhost:8000/api/subscriptions`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                credentials: 'include'
+            const querySnapshot = await db.collection('subscriptions')
+            .where('user_id', '==', userId)
+            .get();
+            
+            allSubscriptions = querySnapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    ...data,
+                    subscription_id: doc.id,
+                    next_renewal_date: data.next_renewal_date?.toDate ? data.next_renewal_date.toDate().toISOString() : data.next_renewal_date,
+                    created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : data.created_at,
+                    updated_at: data.updated_at?.toDate ? data.updated_at.toDate().toISOString() : data.updated_at 
+                };
             });
-            
-            if (!response.ok) throw new Error('Failed to load subscriptions');
-            
-            allSubscriptions = await response.json();
             initPriceRange();
             applyFilters();
         } catch (error) {
@@ -199,27 +212,21 @@ document.addEventListener('DOMContentLoaded', async function() {
     async function editSubscription(id) {
         try {
             const user = await ensureAuthenticated();
-            const token = await user.getIdToken();
+            const doc = await db.collection('subscriptions').doc(id).get();
             
-            const response = await fetch(`http://localhost:8000/api/subscriptions/${id}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                credentials: 'include'
-            });
+            if (!doc.exists) throw new Error('Subscription not found');
             
-            if (!response.ok) throw new Error('Failed to load subscription');
-            
-            const sub = await response.json();
+            const sub = doc.data();
             document.getElementById('modalTitle').textContent = 'Edit Subscription';
-            document.getElementById('subscriptionId').value = sub.subscription_id;
+            document.getElementById('subscriptionId').value = doc.id;
             document.getElementById('subscriptionName').value = sub.service_name;
             document.getElementById('subscriptionCost').value = sub.cost;
             document.getElementById('billingCycle').value = sub.billing_cycle.toLowerCase();
             
             setMinDateForInput();
-            document.getElementById('nextRenewal').value = sub.next_renewal_date.split('T')[0];
+            document.getElementById('nextRenewal').value = sub.next_renewal_date?.toDate ? 
+                sub.next_renewal_date.toDate().toISOString().split('T')[0] : 
+                sub.next_renewal_date.split('T')[0];
             document.getElementById('subscriptionStatus').value = sub.status.toLowerCase();
 
             elements.subscriptionModal.classList.remove('hidden');
@@ -250,16 +257,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         try {
             const user = await ensureAuthenticated();
-            const response = await fetch(`http://localhost:8000/api/subscriptions/${currentSubscriptionId}`, {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${await user.getIdToken()}`
-                },
-                credentials: 'include'
-            });
-            
-            if (!response.ok) throw new Error('Failed to delete subscription');
+            await db.collection('subscriptions').doc(currentSubscriptionId).delete();
             
             updateLocalStorageTimestamp();
             closeDeleteModal();
@@ -288,23 +286,20 @@ document.addEventListener('DOMContentLoaded', async function() {
         };
     
         try {
-            const token = await user.getIdToken();
-            const method = id ? 'PUT' : 'POST';
-            const url = id 
-                ? `http://localhost:8000/api/subscriptions/${id}`
-                : 'http://localhost:8000/api/subscriptions';
-            
-            const response = await fetch(url, {
-                method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(subData),
-                credentials: 'include'
-            });
-            
-            if (!response.ok) throw new Error(id ? 'Failed to update subscription' : 'Failed to create subscription');
+            if (id) {
+                // Update existing subscription
+                await db.collection('subscriptions').doc(id).update({
+                    ...subData,
+                    updated_at: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            } else {
+                // Create new subscription
+                await db.collection('subscriptions').add({
+                    ...subData,
+                    created_at: firebase.firestore.FieldValue.serverTimestamp(),
+                    updated_at: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            }
             
             updateLocalStorageTimestamp();
             closeSubscriptionModal();
@@ -419,31 +414,28 @@ document.addEventListener('DOMContentLoaded', async function() {
     async function updateDashboardMetadata(userId) {
         try {
             const user = await ensureAuthenticated();
-            const token = await user.getIdToken();
             
-            const [subscriptionsResponse, totalResponse] = await Promise.all([
-                fetch(`http://localhost:8000/api/subscriptions`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    credentials: 'include'
-                }),
-                fetch(`http://localhost:8000/api/subscriptions/total/${userId}`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    credentials: 'include'
-                })
-            ]);
+            // Get subscriptions
+            const subscriptionsQuery = await db.collection('subscriptions')
+                .where('user_id', '==', userId)
+                .get();
+                
+            const subscriptions = subscriptionsQuery.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    ...data,
+                    subscription_id: doc.id,
+                    next_renewal_date: data.next_renewal_date?.toDate ? data.next_renewal_date.toDate().toISOString() : data.next_renewal_date
+                };
+            });
             
-            if (!subscriptionsResponse.ok || !totalResponse.ok) {
-                throw new Error('Failed to load dashboard data');
-            }
+            // Calculate total monthly cost
+            let totalMonthly = 0;
+            const activeSubs = subscriptions.filter(sub => sub.status.toLowerCase() === 'active');
             
-            const subscriptions = await subscriptionsResponse.json();
-            const { total } = await totalResponse.json();
+            activeSubs.forEach(sub => {
+                totalMonthly += sub.cost / (sub.billing_cycle.toLowerCase() === 'yearly' ? 12 : 1);
+            });
             
             // Update last updated time
             let lastUpdated = localStorage.getItem('lastSubscriptionUpdate');
@@ -459,7 +451,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             let nextRenewal = findNextRenewal(subscriptions);
             
             // Update UI
-            updateMetadataUI(lastUpdated, total, nextRenewal);
+            updateMetadataUI(lastUpdated, totalMonthly, nextRenewal);
         } catch (error) {
             console.error('Error updating dashboard metadata:', error);
         }
