@@ -155,6 +155,22 @@ body {
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
 }
 
+.verification-message {
+    background-color: #e3f2fd;
+    border: 1px solid #bbdefb;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 20px;
+    text-align: center;
+    color: #1976d2;
+}
+
+.verification-message p {
+    margin: 0;
+    font-size: 16px;
+    line-height: 1.5;
+}
+
 /* Divider styles */
 .divider {
     display: flex;
@@ -179,6 +195,94 @@ body {
     margin-left: 16px;
 }
 
+/* Password Strength Meter - Fixed Left-to-Right Fill */
+.password-strength-container {
+    width: 100%;
+    margin-top: 10px;
+    height: 8px;
+    background-color: #e5e7eb;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.password-strength {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.4s ease-out, background-color 0.4s ease-out;
+    position: absolute;
+    left: 0;
+    top: 0;
+}
+
+.password-strength.strength-0 {
+    background-color: #ef4444; /* red */
+    width: 20%;
+}
+
+.password-strength.strength-1 {
+    background-color: #f97316; /* orange */
+    width: 40%;
+}
+
+.password-strength.strength-2 {
+    background-color: #f59e0b; /* amber */
+    width: 60%;
+}
+
+.password-strength.strength-3 {
+    background-color: #84cc16; /* lime */
+    width: 80%;
+}
+
+.password-strength.strength-4 {
+    background-color: #10b981; /* emerald */
+    width: 100%;
+}
+
+.password-strength-text {
+    font-size: 0.75rem;
+    margin-top: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.strength-label {
+    font-weight: 500;
+}
+
+.strength-label.strength-0 { color: #ef4444; }
+.strength-label.strength-1 { color: #f97316; }
+.strength-label.strength-2 { color: #f59e0b; }
+.strength-label.strength-3 { color: #84cc16; }
+.strength-label.strength-4 { color: #10b981; }
+
+.password-requirements {
+    margin-top: 8px;
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.requirement {
+    display: flex;
+    align-items: center;
+    margin-bottom: 2px;
+}
+
+.requirement i {
+    margin-right: 4px;
+    font-size: 10px;
+}
+
+.requirement.met i {
+    color: #10b981;
+}
+
+.requirement.unmet i {
+    color: #9ca3af;
+}
   
 /* Google Sign-In button styles */
 .btn-google {

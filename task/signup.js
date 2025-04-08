@@ -1,6 +1,144 @@
 const auth = firebase.auth();
 const provider = new firebase.auth.GoogleAuthProvider();
 
+function validatePassword(password, email) {
+  // Check minimum length
+  if (password.length < 6) {
+    return { valid: false, message: "Password must be at least 6 characters long" };
+  }
+
+  // Check for at least one alphabet character
+  if (!/[a-zA-Z]/.test(password)) {
+    return { valid: false, message: "Password must contain at least one letter" };
+  }
+
+  // Check for at least one number
+  if (!/[0-9]/.test(password)) {
+    return { valid: false, message: "Password must contain at least one number" };
+  }
+
+  // Check for at least one special character
+  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+    return { valid: false, message: "Password must contain at least one special character" };
+  }
+
+  return { valid: true, message: "Password is valid" };
+}
+
+// Update the password strength meter logic
+document.getElementById('password').addEventListener('input', function() {
+  const password = this.value;
+  const strengthMeter = document.getElementById('passwordStrength');
+  const strengthTextContainer = document.getElementById('passwordStrengthText');
+
+  if (!password) {
+    strengthMeter.style.width = '0%';
+    strengthMeter.className = 'password-strength';
+    strengthTextContainer.innerHTML = '';
+    
+    // Hide requirements if already shown
+    const requirementsElement = document.getElementById('passwordRequirements');
+    if (requirementsElement) {
+      requirementsElement.style.display = 'none';
+    }
+    return;
+  }
+
+  // Display password requirements if not already shown
+  let requirementsElement = document.getElementById('passwordRequirements');
+  if (!requirementsElement) {
+    requirementsElement = document.createElement('div');
+    requirementsElement.id = 'passwordRequirements';
+    requirementsElement.className = 'password-requirements';
+    document.querySelector('.password-strength-container').after(requirementsElement);
+    
+    // Add requirements list
+    requirementsElement.innerHTML = `
+      <div class="requirement" id="req-length"><i class="fas fa-circle"></i> At least 8 characters</div>
+      <div class="requirement" id="req-letter"><i class="fas fa-circle"></i> Contains letters</div>
+      <div class="requirement" id="req-number"><i class="fas fa-circle"></i> Contains numbers</div>
+      <div class="requirement" id="req-special"><i class="fas fa-circle"></i> Contains special characters</div>
+    `;
+  } else {
+    requirementsElement.style.display = 'block';
+  }
+
+  // Simple strength calculation
+  let strength = 0;
+  let strengthText = '';
+  
+  // Length check
+  const hasMinLength = password.length >= 8;
+  const hasAcceptableLength = password.length >= 6;
+  
+  if (hasMinLength) strength += 25;
+  else if (hasAcceptableLength) strength += 15;
+  
+  // Update requirement indicator
+  updateRequirement('req-length', hasMinLength);
+  
+  // Character variety
+  const hasLetter = /[a-zA-Z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+  const hasSpecial = /[^A-Za-z0-9]/.test(password);
+  
+  if (hasLetter) strength += 25;
+  if (hasNumber) strength += 25;
+  if (hasSpecial) strength += 25;
+  
+  // Update requirement indicators
+  updateRequirement('req-letter', hasLetter);
+  updateRequirement('req-number', hasNumber);
+  updateRequirement('req-special', hasSpecial);
+  
+  // Ensure strength is between 0 and 100
+  strength = Math.max(0, Math.min(100, strength));
+  
+  // Update meter width
+  strengthMeter.style.width = `${strength}%`;
+  
+  // Set strength level class
+  let strengthLevel;
+  if (strength >= 80) {
+    strengthLevel = '4';
+    strengthText = 'Very Strong';
+  } else if (strength >= 60) {
+    strengthLevel = '3';
+    strengthText = 'Strong';
+  } else if (strength >= 40) {
+    strengthLevel = '2';
+    strengthText = 'Moderate';
+  } else if (strength >= 20) {
+    strengthLevel = '1';
+    strengthText = 'Weak';
+  } else {
+    strengthLevel = '0';
+    strengthText = 'Very Weak';
+  }
+  
+  strengthMeter.className = `password-strength strength-${strengthLevel}`;
+  
+  // Update text display with nicer format
+  strengthTextContainer.innerHTML = `
+    <span>Password Strength:</span>
+    <span class="strength-label strength-${strengthLevel}">${strengthText}</span>
+  `;
+});
+
+// Helper function to update requirement status
+function updateRequirement(reqId, isMet) {
+  const reqElement = document.getElementById(reqId);
+  if (isMet) {
+    reqElement.classList.add('met');
+    reqElement.classList.remove('unmet');
+    reqElement.querySelector('i').className = 'fas fa-check-circle';
+  } else {
+    reqElement.classList.add('unmet');
+    reqElement.classList.remove('met');
+    reqElement.querySelector('i').className = 'fas fa-circle';
+  }
+}
+
 document.getElementById('signupForm').addEventListener('submit', async function(event) {
     event.preventDefault();
 
@@ -10,6 +148,7 @@ document.getElementById('signupForm').addEventListener('submit', async function(
     const confirmPassword = document.getElementById('confirmPassword').value;
     const signupButton = document.querySelector('.btn-signup');
     const originalButtonText = signupButton.textContent;
+    const verificationMessage = document.getElementById('verificationMessage');
 
     // Remove any existing error messages
     const existingError = document.querySelector('.error-message');
@@ -27,53 +166,32 @@ document.getElementById('signupForm').addEventListener('submit', async function(
         return;
     }
 
-    if (password.length < 6) {
-        showErrorMessage("Password must be at least 6 characters");
-        return;
+    // Enhanced password validation
+    const passwordValidation = validatePassword(password, email);
+    if (!passwordValidation.valid) {
+      showErrorMessage(passwordValidation.message);
+      return;
     }
 
     try {
-        // Show loading state for signup button
-        signupButton.innerHTML = '<span class="button-loading"><i class="fas fa-spinner fa-spin"></i> Signing up...</span>';
-        signupButton.disabled = true;
-        
-        // Send signup request to FastAPI
-        const response = await fetch('http://localhost:8000/auth/register', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                email: email,
-                password: password
-            })
-        });
-        
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Registration failed');
-        }
-        
-        const data = await response.json();
-        
-        // Show success message before redirect to login page
-        const successMessage = document.createElement('div');
-        successMessage.className = 'error-message';
-        successMessage.style.backgroundColor = '#d4edda';
-        successMessage.style.color = '#155724';
-        successMessage.style.borderColor = '#c3e6cb';
-        successMessage.textContent = 'Registration successful! Redirecting to login...';
-        document.querySelector('.signup-header').appendChild(successMessage);
-        
-        setTimeout(() => {
-            window.location.href = 'login.html';
-        }, 1500);
-        
+      // Show loading state for signup button
+      signupButton.innerHTML = '<span class="button-loading"><i class="fas fa-spinner fa-spin"></i> Signing up...</span>';
+      signupButton.disabled = true;
+      
+      await auth.createUserWithEmailAndPassword(email, password)
+      .then((userCredential) => {
+        const user = userCredential.user;
+
+        return user.sendEmailVerification();
+      })
+
+      document.getElementById('signupForm').style.display = 'none';
+      verificationMessage.style.display = 'block';
     } catch (error) {
-        showErrorMessage(`Error: ${error.message}`);
+      showErrorMessage(`Registration error: ${error.message}`);
     } finally {
-        signupButton.innerHTML = originalButtonText;
-        signupButton.disabled = false;
+      signupButton.innerHTML = originalButtonText;
+      signupButton.disabled = false;
     }
 });
 

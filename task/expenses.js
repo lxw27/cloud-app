@@ -381,8 +381,14 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Chart functions
     function destroyCharts() {
-        if (state.pieChartInstance) state.pieChartInstance.destroy();
-        if (state.barChartInstance) state.barChartInstance.destroy();
+        if (state.pieChartInstance) {
+            state.pieChartInstance.destroy();
+            state.pieChartInstance = null;
+        }
+        if (state.barChartInstance) {
+            state.barChartInstance.destroy();
+            state.barChartInstance = null;
+        }
     }
 
     // Initialize pie chart for expense distribution
@@ -395,8 +401,22 @@ document.addEventListener('DOMContentLoaded', async function() {
             }
         
             // Include only active subscriptions
-            const activeSubs = filteredSubs.filter(sub => sub.status.toLowerCase() === 'active');
-            if (activeSubs.length === 0) return null;
+            const activeSubs = filteredSubs.filter(sub => sub.status && sub.status.toLowerCase() === 'active');
+            if (activeSubs.length === 0) {
+                return new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['No active subscriptions'],
+                        datasets: [{
+                            data: [1],
+                            backgroundColor: ['rgba(200, 200, 200, 0.2)'],
+                            borderColor: 'white',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: getPieChartOptions()
+                });
+            }
             
             const labels = activeSubs.map(sub => sub.service_name);
             const data = activeSubs.map(sub => getMonthlyEquivalent(sub.cost, sub.billing_cycle));
@@ -554,7 +574,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         updatePeriodDropdown(isMonthly);
         destroyCharts();
-        state.barChartInstance = initBarChart(isMonthly);
+        setTimeout(() => {
+            state.pieChartInstance = initPieChart();
+            state.barChartInstance = initBarChart(isMonthly);
+        }, 50);
     }
 
     // Update period dropdown based on view type
@@ -598,8 +621,13 @@ document.addEventListener('DOMContentLoaded', async function() {
     function filterSubscriptionsByYear(year) {
         return state.allSubscriptions.filter(sub => {
             if (!sub.next_renewal_date) return false;
-            const subDate = new Date(sub.next_renewal_date);
-            return subDate.getFullYear().toString() === year;
+            try {
+                const subDate = new Date(sub.next_renewal_date);
+                return subDate.getFullYear().toString() === year;
+            } catch (e) {
+                console.error('Invalid date format:', sub.next_renewal_date);
+                return false;
+            }
         });
     }
     

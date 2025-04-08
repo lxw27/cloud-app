@@ -2,89 +2,179 @@ from enum import Enum
 from datetime import datetime, timedelta
 from typing import Optional, List
 import os
+from fastapi.responses import JSONResponse
 import jwt
 import secrets
 import uuid
-import smtplib
 import requests
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from apscheduler.schedulers.background import BackgroundScheduler
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Response, Request, Cookie, Depends, BackgroundTasks
+import re 
+from typing import Tuple 
+from fastapi import FastAPI, HTTPException, Response, Request, Cookie, Depends, status, Header 
 from fastapi.security import HTTPBasicCredentials, HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, constr 
 from firebase_admin import credentials, firestore, auth, initialize_app
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
+from fastapi.middleware import Middleware 
+from starlette.middleware.base import BaseHTTPMiddleware
 
 # Configuration
 load_dotenv()
 
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
 # Firebase
-FIREBASE_CRED_PATH = os.getenv("FIREBASE_CREDENTIAL_PATH", "cloud-c8d3a-firebase-adminsdk-fbsvc-f03dced741.json")
 FIREBASE_API_KEY = os.getenv("FIREBASE_API_KEY")
-firebase_cred = credentials.Certificate(FIREBASE_CRED_PATH)
+firebase_cred = credentials.Certificate({
+    "type": os.getenv("FIREBASE_TYPE"),
+    "project_id": os.getenv("FIREBASE_PROJECT_ID"),
+    "private_key_id": os.getenv("FIREBASE_PRIVATE_KEY_ID"),
+    "private_key": os.getenv("FIREBASE_PRIVATE_KEY").replace('\\n', '\n'),
+    "client_email": os.getenv("FIREBASE_CLIENT_EMAIL"),
+    "client_id": os.getenv("FIREBASE_CLIENT_ID"),
+    "auth_uri": os.getenv("FIREBASE_AUTH_URI"),
+    "token_uri": os.getenv("FIREBASE_TOKEN_URI"),
+    "auth_provider_x509_cert_url": os.getenv("FIREBASE_AUTH_PROVIDER_CERT_URL"),
+    "client_x509_cert_url": os.getenv("FIREBASE_CLIENT_CERT_URL"),
+    "universe_domain": os.getenv("FIREBASE_UNIVERSE_DOMAIN")
+})
 firebase_app = initialize_app(firebase_cred)
 db = firestore.client()
 
 # JWT
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-fallback-secret-key")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+if not SECRET_KEY or len(SECRET_KEY) < 32:
+    raise ValueError("JWT_SECRET_KEY must be at least 32 characters long")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
+REFRESH_TOKEN_EXPIRE_DAYS = 7
 
-# Email
-SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
-SMTP_USER = os.getenv("SMTP_USER")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
-EMAIL_FROM = os.getenv("EMAIL_FROM", "noreply@subtrack.com")
+# Security Headers Middleware
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Content-Security-Policy"] = "default-src 'self'"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
+
+# FastAPI setup with middleware
+middleware = [
+    Middleware(SecurityHeadersMiddleware),
+    Middleware(
+        CORSMiddleware,
+        allow_origins=os.getenv("ALLOWED_ORIGINS", "http://127.0.0.1:3000,http://localhost:3000").split(","),
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+]
 
 # FastAPI setup
-app = FastAPI()
+app = FastAPI(middleware=middleware)
 security = HTTPBearer()
 
-# CORS configuration
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://127.0.0.1:3000", "http://localhost:3000", "http://localhost"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+if os.getenv("ENVIRONMENT") == "production":
+    app.add_middleware(HTTPSRedirectMiddleware)
+
+# # CORS configuration
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=os.getenv("ALLOWED_ORIGINS", "http://127.0.0.1:3000,http://localhost:3000").split(","),
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
+
+# Rate limiting for auth endpoints
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+    return HTTPException(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        detail="Too many requests"
+    )
 
 # Helper functions
+def create_custom_token(uid: str) -> str:
+    """Create a custom Firebase token for the user"""
+    return auth.create_custom_token(uid).decode('utf-8')
+
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=15))
-    to_encode.update({"exp": expire})
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire, "type": "access"})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-def set_auth_cookie(response: Response, token: str, expires: timedelta) -> None:
+def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS))
+    to_encode.update({"exp": expire, "type": "refresh"})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def set_auth_cookies(response: Response, access_token: str, refresh_token: str, expires: timedelta) -> None:
+    secure = os.getenv("ENVIRONMENT") == "production"
+    cookie_prefix = "__Host-" if secure else ""
+    
     response.set_cookie(
-        key="token",
-        value=token,
+        key=f"{cookie_prefix}access_token",
+        value=access_token,
         httponly=True,
+        secure=secure,
+        samesite="strict",
         max_age=expires.total_seconds(),
-        expires=expires.total_seconds(),
-        samesite="lax",
-        secure=os.getenv("ENVIRONMENT") == "production"
+        path="/"
+    )
+    
+    response.set_cookie(
+        key=f"{cookie_prefix}refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=secure,
+        samesite="strict",
+        max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 3600,
+        path="/auth/refresh"
     )
 
 async def get_current_user(token: str = Cookie(None)) -> dict:
     if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
     try:
-        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "access":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token type"
+            )
+        return payload
     except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token expired",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
     except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
 
 async def verify_firebase_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
     try:
         return auth.verify_id_token(credentials.credentials)
     except Exception:
-        raise HTTPException(status_code=401, detail="Invalid authentication credentials")
+        raise HTTPException(status_code=401, detail="Authentication failed")
 
 def get_user_data(user_id: str) -> Optional[dict]:
     user_doc = db.collection('users').document(user_id).get()
@@ -97,54 +187,56 @@ def verify_firebase_password(email: str, password: str) -> dict:
     
     if not response.ok:
         error_data = response.json()
-        raise HTTPException(
-            status_code=401,
-            detail=error_data.get("error", {}).get("message", "Invalid credentials")
-        )
+        raise HTTPException(status_code=401, detail="Invalid credentials")
     return response.json()
 
-async def send_notification_email(user_id: str, subscriptions: list) -> bool:
-    try:
-        user = auth.get_user(user_id)
-        if not user.email:
-            return False
-        
-        email_body = generate_notification_email(subscriptions)
-        success = send_email(
-            to_email=user.email,
-            subject=f"Renewal Reminder: {len(subscriptions)} subscription{'s' if len(subscriptions) > 1 else ''}",
-            html_content=email_body
-        )
-        
-        if success:
-            for sub in subscriptions:
-                db.collection("notifications").add({
-                    "user_id": user_id,
-                    "email": user.email,
-                    "subscription_name": sub["service_name"],
-                    "renewal_date": sub["next_renewal_date"],
-                    "amount": sub["cost"],
-                    "sent_at": datetime.utcnow().isoformat(),
-                    "status": "sent"
-                })
-        return success
-    except Exception as e:
-        print(f"Error sending notification to {user_id}: {str(e)}")
-        return False
+def validate_password(password: str, email: str) -> Tuple[bool, str]:
+    """Validate password meets security requirements."""
+    # Check minimum length
+    if len(password) < 6:
+        return False, "Password must be at least 6 characters long"
+    
+    # Check for at least one alphabet character
+    if not re.search(r'[a-zA-Z]', password):
+        return False, "Password must contain at least one letter"
+    
+    # Check for at least one number
+    if not re.search(r'[0-9]', password):
+        return False, "Password must contain at least one number"
+    
+    # Check for at least one special character
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+        return False, "Password must contain at least one special character"
+    
+    # Check if password contains email or username parts
+    email_parts = email.split('@')[0].split('.')
+    for part in email_parts:
+        if part.lower() in password.lower() and len(part) > 3:
+            return False, "Password should not contain parts of your email"
+    
+    return True, "Password is valid"
+
+async def verify_csrf_token(
+    request: Request,
+    csrf_token: str = Header(None, alias="X-CSRF-Token")
+):
+    if not csrf_token or csrf_token != request.cookies.get("csrf_token"):
+        raise HTTPException(status_code=403, detail="Invalid CSRF token")
+
 
 # Models
 class UserLogin(BaseModel):
-    email: str
+    email: EmailStr
     password: str
-    remember_me: bool = False
 
 class UserCreate(BaseModel):
-    email: str
+    email: EmailStr
     password: str
 
-class Token(BaseModel):
+class TokenPair(BaseModel):
     access_token: str
-    token_type: str
+    refresh_token: str
+    token_type: str = "bearer"
     
 class ForgotPasswordRequest(BaseModel):
     email: str
@@ -173,81 +265,89 @@ class SubscriptionResponse(Subscription):
     created_at: datetime
     updated_at: datetime
 
-class RenewalNotificationRequest(BaseModel):
-    email: str 
-    subscription_name: str 
-    renewal_date: str 
-    amount: float
-
-# Email functions
-def generate_notification_email(subscriptions: list) -> str:
-    """Generate HTML email content for subscription renewals"""
-    subscriptions_html = "\n".join(
-        f"<li><strong>{sub['service_name']}</strong> - ${sub['cost']:.2f} (renews on {sub['next_renewal_date']})</li>"
-        for sub in subscriptions
-    )
-    
-    total_amount = sum(sub['cost'] for sub in subscriptions)
-    
-    return f"""
-    <html>
-    <body>
-        <p>Hello,</p>
-        <p>This is a reminder about your upcoming subscription renewals:</p>
-        <ul>
-            {subscriptions_html}
-        </ul>
-        <p><strong>Total amount: ${total_amount:.2f}</strong></p>
-        <p>Thank you for using SubTrack!</p>
-    </body>
-    </html>
-    """
-
-def send_email(to_email: str, subject: str, html_content: str) -> bool:
-    """Send email using SMTP"""
-    if not all([SMTP_SERVER, SMTP_PORT, SMTP_USER, SMTP_PASSWORD]):
-        raise ValueError("SMTP configuration is incomplete")
-    
-    msg = MIMEMultipart()
-    msg['From'] = EMAIL_FROM
-    msg['To'] = to_email
-    msg['Subject'] = subject
-    msg.attach(MIMEText(html_content, 'html'))
-    
-    try:
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls()
-            server.login(SMTP_USER, SMTP_PASSWORD)
-            server.send_message(msg)
-            return True
-    except Exception as e:
-        print(f"Error sending email: {str(e)}")
-        return False
-
 # Authentication endpoints
 @app.get("/")
 def read_root():
     return {"message": "SubTrack API - User Authentication Service"}
 
 @app.post("/auth/login")
-async def login(user_data: UserLogin, response: Response):
+@limiter.limit("5/minute")
+async def login(
+    request: Request,
+    user_data: UserLogin, 
+    response: Response
+):
     try:
         auth_result = verify_firebase_password(user_data.email, user_data.password)
         user = auth.get_user_by_email(user_data.email)
 
-        expires = timedelta(days=30 if user_data.remember_me else 1)
         access_token = create_access_token(
-            data={"sub": user.uid, "email": user_data.email},
-            expires_delta=expires
+            data={"sub": user.uid, "email": user_data.email, "scope": "user"}
+        )
+        refresh_token = create_refresh_token(
+            data={"sub": user.uid}
         )
         
-        set_auth_cookie(response, access_token, expires)
-        return {"access_token": access_token, "token_type": "bearer", "user_id": user.uid}
+        set_auth_cookies(response, access_token, refresh_token, timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+        return TokenPair(
+            access_token=access_token,
+            refresh_token=refresh_token
+        )
     
-    except auth.UserNotFoundError:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        # Generic error message to prevent information leakage
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials"
+        )
+    
+@app.post("/auth/refresh")
+async def refresh_token(
+    request: Request,
+    response: Response,
+    refresh_token: str = Cookie(None)
+):
+    if not refresh_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token required"
+        )
+    
+    try:
+        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "refresh":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token type"
+            )
+        
+        # Get user data
+        user = auth.get_user(payload["sub"])
+        
+        # Create new tokens
+        access_token = create_access_token(
+            data={"sub": user.uid, "email": user.email, "scope": "user"}
+        )
+        new_refresh_token = create_refresh_token(
+            data={"sub": user.uid}
+        )
+        
+        set_auth_cookies(response, access_token, new_refresh_token, timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+        return TokenPair(
+            access_token=access_token,
+            refresh_token=new_refresh_token
+        )
+    
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token expired"
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token"
+        )
 
 @app.post("/auth/google")
 async def google_login(request: GoogleLoginRequest, response: Response):
@@ -270,39 +370,120 @@ async def google_login(request: GoogleLoginRequest, response: Response):
             data={"sub": uid, "email": decoded_token.get('email')},
             expires_delta=expires
         )
-        set_auth_cookie(response, access_token, expires)
+        set_auth_cookies(response, access_token, "", expires)
         
         return {"access_token": access_token, "token_type": "bearer", "user_id": uid}
     
-    except auth.InvalidIdTokenError:
-        raise HTTPException(status_code=401, detail="Invalid Google token")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=401, detail="Authentication failed")
 
 @app.post("/auth/register")
-async def signup(user_data: UserCreate):
+async def signup(user_data: UserCreate, request: Request):
     try:
-        user = auth.create_user(email=user_data.email, password=user_data.password)
+        # Validate password
+        is_valid, message = validate_password(user_data.password, user_data.email)
+        if not is_valid:
+            raise HTTPException(status_code=400, detail=message)
+        
+        # Create the user in Firebase Authentication
+        user = auth.create_user(
+            email=user_data.email,
+            password=user_data.password,
+            email_verified=False
+        )
+        
+        # Store user info in Firestore
         db.collection('users').document(user.uid).set({
             'uid': user.uid, 
             'email': user_data.email,
+            'email_verified': False,
             'created_at': datetime.utcnow().isoformat()
         })
-        return {"message": "User created successfully", "user_id": user.uid}
+
+        # Generate verification link
+        verification_link = auth.generate_email_verification_link(
+            user_data.email,
+            action_code_settings=auth.ActionCodeSettings(
+                url=f"{request.base_url}dashboard",
+                handle_code_in_app=True
+            )
+        )
         
+        # Send email via Firebase Authentication REST API
+        # Note: Firebase Admin SDK doesn't directly send emails, 
+        # you need to use the Auth REST API or a third-party email service
+        auth_url = f"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={FIREBASE_API_KEY}"
+        response = requests.post(auth_url, json={
+            "requestType": "VERIFY_EMAIL",
+            "idToken": create_custom_token(user.uid)  # You'll need to get a token for the user
+        })
+        
+        if not response.ok:
+            # Log the error but don't fail registration
+            print(f"Error sending verification email: {response.text}")
+        
+        return {
+            "message": "User registered successfully. Verification email sent.",
+            "user_id": user.uid,
+            "email_verified": False
+        }
+
     except auth.EmailAlreadyExistsError:
-        raise HTTPException(status_code=400, detail="Email already registered")
+        raise HTTPException(
+            status_code=400,
+            detail="Email already exists. Please use a different email or login."
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=400,
+            detail=f"Registration failed: {str(e)}"
+        )
 
 @app.post("/auth/logout")
 async def logout(response: Response):
-    response.delete_cookie(key="token")
+    secure = os.getenv("ENVIRONMENT") == "production"
+    
+    response.delete_cookie(
+        key="access_token",
+        path="/",
+        secure=secure,
+        samesite="strict"
+    )
+    response.delete_cookie(
+        key="refresh_token",
+        path="/auth/refresh",
+        secure=secure,
+        samesite="strict"
+    )
     return {"message": "Logged out successfully"}
 
 @app.get("/auth/me")
 async def get_me(current_user: dict = Depends(get_current_user)):
     return {k: v for k, v in current_user.items() if k != 'password'}
+
+@app.post("/auth/send-verification-email")
+async def send_verification_email(
+    request: Request,
+    current_user: dict = Depends(get_current_user)
+):
+    try:
+        # Get the Firebase user
+        user = auth.get_user(current_user["sub"])
+        
+        # Generate the email verification link
+        action_code_settings = auth.ActionCodeSettings(
+            url=f"{request.base_url}dashboard",  # Redirect after verification
+            handle_code_in_app=True
+        )
+        link = auth.generate_email_verification_link(
+            user.email,
+            action_code_settings=action_code_settings
+        )
+        
+        return {"verification_link": link}
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/auth/forgot-password")
 async def forgot_password(request: ForgotPasswordRequest):
@@ -313,15 +494,9 @@ async def forgot_password(request: ForgotPasswordRequest):
             "email": request.email
         })
         
-        if not response.ok:
-            error_data = response.json()
-            raise HTTPException(
-                status_code=400,
-                detail=error_data.get("error", {}).get("message", "Failed to send reset email")
-            )
-        return {"message": "Password reset email sent"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"message": "If the email exists, a reset link has been sent"}
+    except Exception:
+        raise HTTPException(status_code=500, detail="Request failed")
 
 # Subscription endpoints
 @app.get("/api/subscriptions")
@@ -338,7 +513,7 @@ async def get_subscriptions(decoded_token: dict = Depends(verify_firebase_token)
 async def get_subscription(subscription_id: str, decoded_token: dict = Depends(verify_firebase_token)):
     doc = db.collection('subscriptions').document(subscription_id).get()
     if not doc.exists or doc.to_dict()['user_id'] != decoded_token['uid']:
-        raise HTTPException(status_code=404, detail="Subscription not found")
+        raise HTTPException(status_code=404, detail="Resource not found")
     return {**doc.to_dict(), "subscription_id": doc.id}
 
 @app.post("/api/subscriptions", response_model=SubscriptionResponse)
@@ -347,7 +522,7 @@ async def create_subscription(
     decoded_token: dict = Depends(verify_firebase_token)
 ):
     if decoded_token['uid'] != subscription.user_id:
-        raise HTTPException(status_code=403, detail="Unauthorized")
+        raise HTTPException(status_code=403, detail="Access denied")
     
     now = datetime.now()
     doc_ref = db.collection('subscriptions').document()
@@ -369,9 +544,9 @@ async def update_subscription(
     doc = doc_ref.get()
     
     if not doc.exists or doc.to_dict()['user_id'] != decoded_token['uid']:
-        raise HTTPException(status_code=404, detail="Subscription not found")
+        raise HTTPException(status_code=404, detail="Resource not found")
     if decoded_token['uid'] != subscription.user_id:
-        raise HTTPException(status_code=403, detail="Unauthorized")
+        raise HTTPException(status_code=403, detail="Access denied")
     
     update_data = {
         **subscription.dict(),
@@ -413,105 +588,12 @@ async def get_monthly_total(
             
     return {"total": round(monthly_total, 2)}
 
-# Notification endpoints
-# @app.post("/api/send-renewal-notification")
-# async def send_renewal_notification(
-#     request: RenewalNotificationRequest,
-#     background_tasks: BackgroundTasks
-# ):
-#     try:
-#         try:
-#             user = auth.get_user_by_email(request.email)
-#         except auth.UserNotFoundError:
-#             raise HTTPException(status_code=404, detail="User not found")
-        
-#         email_body = generate_notification_email([{
-#             "service_name": request.subscription_name,
-#             "cost": request.amount,
-#             "next_renewal_date": request.renewal_date
-#         }])
-        
-#         background_tasks.add_task(
-#             send_email,
-#             to_email=request.email,
-#             subject=f"Renewal Reminder: {request.subscription_name}",
-#             html_content=email_body
-#         )
-        
-#         db.collection("notifications").add({
-#             "user_id": user.uid,
-#             "email": request.email,
-#             "subscription_name": request.subscription_name,
-#             "renewal_date": request.renewal_date,
-#             "amount": request.amount,
-#             "sent_at": datetime.utcnow().isoformat(),
-#             "status": "sent"
-#         })
-        
-#         return {"message": "Notification queued for sending"}
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
-
-# @app.post("/api/check-renewals")
-# async def check_upcoming_renewals(background_tasks: BackgroundTasks):
-#     try:
-#         tomorrow = datetime.utcnow() + timedelta(days=1)
-#         tomorrow_str = tomorrow.strftime("%Y-%m-%d")
-        
-#         subs_ref = db.collection("subscriptions") \
-#             .where("status", "==", "Active") \
-#             .where("next_renewal_date", "==", tomorrow_str)
-        
-#         user_subs = {}
-#         for sub in subs_ref.stream():
-#             sub_data = sub.to_dict()
-#             user_id = sub_data["user_id"]
-            
-#             if user_id not in user_subs:
-#                 user_subs[user_id] = []
-#             user_subs[user_id].append(sub_data)
-        
-#         processed = 0
-#         for user_id, subscriptions in user_subs.items():
-#             try:
-#                 notified = db.collection("notifications") \
-#                     .where("user_id", "==", user_id) \
-#                     .where("sent_at", ">=", datetime.utcnow().strftime("%Y-%m-%d")) \
-#                     .limit(1).get()
-                
-#                 if notified:
-#                     continue
-                
-#                 background_tasks.add_task(
-#                     send_notification_email,
-#                     user_id=user_id,
-#                     subscriptions=subscriptions
-#                 )
-                
-#                 processed += 1
-                
-#             except Exception as e:
-#                 print(f"Error processing user {user_id}: {str(e)}")
-#                 continue
-        
-#         return {
-#             "message": "Renewal check completed",
-#             "users_processed": processed,
-#             "subscriptions_processed": sum(len(subs) for subs in user_subs.values())
-#         }
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=str(e))
-
-# # Scheduled jobs
-# scheduler = BackgroundScheduler()
-# scheduler.add_job(
-#     func=lambda: requests.post(f"http://{os.getenv('HOST', 'localhost')}:{os.getenv('PORT', '8000')}/api/check-renewals"),
-#     trigger="cron",
-#     hour=9,  # 9 AM UTC
-#     timezone="UTC"
-# )
-# scheduler.start()
-
-# @app.on_event("shutdown")
-# def shutdown_event():
-#     scheduler.shutdown()
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    response = JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+    if exc.status_code == 401:
+        response.headers["WWW-Authenticate"] = "Bearer"
+    return response 

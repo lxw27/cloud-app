@@ -38,10 +38,13 @@
             <i class="fas fa-lock"></i>
           </div>
           <input type="password" id="password" name="password" class="form-input" placeholder="••••••••" required>
-          <div class="password-strength" id="passwordStrength"></div>
           <div class="password-toggle" id="togglePassword">
             <i class="fas fa-eye"></i>
           </div>
+        </div>
+        <div class="password-strength-container">
+          <div class="password-strength" id="passwordStrength"></div>
+          <div class="password-strength-text" id="passwordStrengthText"></div>
         </div>
       </div>
       
@@ -51,7 +54,7 @@
           <div class="input-icon">
             <i class="fas fa-lock"></i>
           </div>
-          <input type="password" id="confirmPassword" name="confirmPassword" class="form-input" placeholder="••••••••" required>
+          <input type="password" id="confirmPassword" name="confirmPassword" class="form-input" required>
           <div class="password-toggle" id="toggleConfirmPassword">
             <i class="fas fa-eye"></i>
           </div>
@@ -67,6 +70,10 @@
       
       <button type="submit" class="btn-signup">Sign Up</button>
     </form>
+
+    <div id="verificationMessage" class="verification-message" style="display: none;">
+      <p>A verification email has been sent to your email address. Please check your inbox and verify your email to complete registration.</p>
+    </div>
 
     <!-- Add divider -->
     <div class="divider">
