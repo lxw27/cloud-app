@@ -1,5 +1,6 @@
 const auth = firebase.auth();
 const provider = new firebase.auth.GoogleAuthProvider();
+const db = firebase.firestore();
 
 // Configuration
 const ACCESS_TOKEN_EXPIRE_MINUTES = 30;
@@ -346,6 +347,10 @@ document.getElementById('googleSignUp')?.addEventListener('click', async functio
     // Show loading state of Google signup button
     googleButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing up...';
     googleButton.disabled = true;
+
+    provider.setCustomParameters({
+      prompt: 'select_account'
+    });
     
     // Remove any existing error messages
     const existingError = document.querySelector('.error-message');
@@ -356,31 +361,14 @@ document.getElementById('googleSignUp')?.addEventListener('click', async functio
     // Sign in with Google
     const result = await auth.signInWithPopup(provider);
     const user = result.user;
-    
-    // Send Google ID token to backend for verification
-    const response = await fetch('/auth/google', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-      body: JSON.stringify({
-        token: await user.getIdToken()
-      })
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Google sign up failed');
+
+    // Insert user data to database
+    const userData = {
+      user_id: user.uid,
+      email: user.email
     }
     
-    // Get tokens from response and set cookies
-    const data = await response.json();
-    setAuthCookies(
-      data.access_token,
-      data.refresh_token,
-      ACCESS_TOKEN_EXPIRE_MINUTES * 60
-    );
+    await db.collection('users').doc(user.uid).set(userData, { merge: true });
     
     // Show success message before redirect to dashboard
     const successMessage = document.createElement('div');
@@ -396,7 +384,31 @@ document.getElementById('googleSignUp')?.addEventListener('click', async functio
     }, 1500);
     
   } catch (error) {
-    showErrorMessage(`Error: ${error.message}`);
+    console.error('Google signup error:', error);
+    let errorMessage = 'Account creation failed. Please try again.';
+    
+    // Handle specific Firebase errors
+    if (error.code) {
+      switch(error.code) {
+        case 'auth/popup-closed-by-user':
+          errorMessage = 'Sign-up popup was closed. Please try again.';
+          break;
+        case 'auth/cancelled-popup-request':
+          errorMessage = 'Sign-up was cancelled. Please try again.';
+          break;
+        case 'auth/account-exists-with-different-credential':
+          errorMessage = 'An account already exists with this email. Please login instead.';
+          break;
+        case 'auth/popup-blocked':
+          errorMessage = 'Popup was blocked by your browser. Please allow popups for this site.';
+          break;
+        case 'permission-denied':
+          errorMessage = 'Database permission denied. Contact support.';
+          break;
+      }
+    }
+    
+    showErrorMessage(errorMessage);
   } finally {
     // Reset button state to clickable
     const googleButton = document.getElementById('googleSignUp');

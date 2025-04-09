@@ -1,41 +1,23 @@
-const firebaseConfig = {
-  apiKey: "AIzaSyDtUAf_vVUdR_sknDbFqdAG3lu6Zo0jp9o",
-  authDomain: "cloud-c8d3a.firebaseapp.com",
-  projectId: "cloud-c8d3a",
-  storageBucket: "cloud-c8d3a.appspot.com",
-  messagingSenderId: "768752961591",
-  appId: "1:768752961591:web:2cafa172dd2fe5a52fd7b2"
-};
-const firebaseApp = firebase.initializeApp(firebaseConfig)
+if (!firebase.apps.length) {
+  const firebaseConfig = {
+    apiKey: "AIzaSyDtUAf_vVUdR_sknDbFqdAG3lu6Zo0jp9o",
+    authDomain: "cloud-c8d3a.firebaseapp.com",
+    projectId: "cloud-c8d3a",
+    storageBucket: "cloud-c8d3a.appspot.com",
+    messagingSenderId: "768752961591",
+    appId: "1:768752961591:web:2cafa172dd2fe5a52fd7b2"
+  };
+  firebase.initializeApp(firebaseConfig);
+}
 const auth = firebase.auth();
 const provider = new firebase.auth.GoogleAuthProvider();
-
-// Enhanced CSRF token generation with entropy check
-function generateCSRFToken() {
-  const token = crypto.randomUUID ? crypto.randomUUID() : 
-    Math.random().toString(36).substring(2) + Date.now().toString(36);
-  
-  // Verify token has sufficient entropy
-  if (token.length < 32 || !/[a-z]/.test(token) || !/[0-9]/.test(token)) {
-    console.error('Generated CSRF token lacks sufficient entropy');
-    return generateCSRFToken(); // Regenerate if weak
-  }
-  
-  document.getElementById('csrfToken').value = token;
-  document.getElementById('forgotPasswordCsrfToken').value = token;
-  
-  // Set as cookie for API requests
-  const secure = window.location.protocol === 'https:';
-  document.cookie = `csrf_token=${token}; Path=/; ${secure ? 'Secure; ' : ''}SameSite=Strict`;
-  
-  return token;
-}
+const db = firebase.firestore();
 
 // Password validation (moved from Python)
 function validatePassword(password, email) {
   // Check minimum length
-  if (password.length < 8) {
-    return { valid: false, message: "Password must be at least 8 characters long" };
+  if (password.length < 6) {
+    return { valid: false, message: "Password must be at least 6 characters long" };
   }
   
   // Check for at least one alphabet character
@@ -65,9 +47,7 @@ function validatePassword(password, email) {
 }
 
 // Initialize security features
-document.addEventListener('DOMContentLoaded', () => {
-  generateCSRFToken();
-  
+document.addEventListener('DOMContentLoaded', () => {  
   // Set security headers for API requests
   if (window.Headers) {
     const headers = new Headers();
@@ -111,13 +91,6 @@ function setAuthCookies(tokenData) {
 
 document.getElementById('loginForm').addEventListener('submit', async function(event) {
   event.preventDefault();
-
-  // Verify CSRF token
-  const csrfToken = document.getElementById('csrfToken').value;
-  if (!csrfToken) {
-    showErrorMessage("Invalid request. Please refresh the page and try again.");
-    return;
-  }
 
   const email = sanitizeInput(document.getElementById('email').value);
   const password = document.getElementById('password').value; // Don't sanitize password
@@ -181,14 +154,31 @@ document.getElementById('googleSignIn').addEventListener('click', async function
     const originalButtonText = googleButton.innerHTML;
     googleButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in...';
     googleButton.disabled = true;
+
+    provider.setCustomParameters({
+      prompt: 'select_account'
+    });
+
+    await auth.signOut();
     
-    const result = await auth.signInWithPopup(provider);
-    const user = result.user;
+    const result = await auth.signInWithPopup(provider).catch(error => {
+      if (error.code === 'auth/popup-blocked') {
+        return auth.signInWithRedirect(provider);
+      }
+      throw error;
+    });
+    
+    // Handle both popup and redirect flows
+    const user = result ? result.user : await auth.getRedirectResult().then(res => res.user);
+    
+    if (!user) throw new Error('User authentication failed');
+    
+    // Get ID token after successful authentication
     const idToken = await user.getIdToken();
     
     // Set secure cookie
     document.cookie = `__Host-authToken=${idToken}; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=3600`;
-    window.location.href = 'dashboard.html';
+    window.location.href = 'dashboard.html'; // Changed from login.html to dashboard.html
     
   } catch (error) {
     console.error('Google sign-in error:', error);
@@ -246,13 +236,6 @@ window.addEventListener('click', function(event) {
 
 forgotPasswordForm.addEventListener('submit', async function(event) {
   event.preventDefault();
-  
-  // Verify CSRF token
-  const csrfToken = document.getElementById('forgotPasswordCsrfToken').value;
-  if (!csrfToken) {
-    showFeedback("Invalid request. Please refresh the page and try again.", 'error');
-    return;
-  }
 
   const email = sanitizeInput(document.getElementById('reset-email').value);
   const resetButton = document.querySelector('.btn-reset');
