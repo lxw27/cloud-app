@@ -1,0 +1,24 @@
+{
+  "hosting": {
+    "public": "task",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/",
+        "destination": "/login.html"
+      },
+      {
+        "source": "/login",
+        "destination": "/login.html"
+      },
+      {
+        "source": "**", 
+        "destination": "/login.html"
+      }
+    ]
+  }
+}
