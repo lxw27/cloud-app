@@ -425,7 +425,9 @@ document.addEventListener('DOMContentLoaded', async function() {
                 return {
                     ...data,
                     subscription_id: doc.id,
-                    next_renewal_date: data.next_renewal_date?.toDate ? data.next_renewal_date.toDate().toISOString() : data.next_renewal_date
+                    next_renewal_date: data.next_renewal_date?.toDate ? data.next_renewal_date.toDate().toISOString() : data.next_renewal_date,
+                    updated_at: data.updated_at?.toDate ? data.updated_at.toDate() : data.updated_at,
+                    created_at: data.created_at?.toDate ? data.created_at.toDate() : data.created_at
                 };
             });
             
@@ -442,9 +444,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             if (!lastUpdated && subscriptions.length > 0) {
                 const timestamps = subscriptions.map(sub => {
                     const dateStr = sub.updated_at || sub.created_at;
-                    return dateStr ? new Date(dateStr) : new Date(0);
-                });
-                lastUpdated = new Date(Math.max(...timestamps));
+                    return dateStr ? new Date(dateStr) : null;
+                }).filter(date => date !== null);
+
+                if (timestamps.length > 0) {
+                    lastUpdated = new Date(Math.max(...timestamps));
+                }
             }
             
             // Find next renewal
