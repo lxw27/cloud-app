@@ -422,12 +422,24 @@ document.addEventListener('DOMContentLoaded', async function() {
                 
             const subscriptions = subscriptionsQuery.docs.map(doc => {
                 const data = doc.data();
+
+                const convertFirestoreTimestamp = (timestamp) => {
+                    if (!timestamp) return null;
+                    if (typeof timestamp.toDate === 'function') {
+                        return timestamp.toDate();
+                    }
+                    if (timestamp.seconds) {
+                        return new Date(timestamp.seconds * 1000);
+                    }
+                    return new Date(timestamp);
+                };
+
                 return {
                     ...data,
                     subscription_id: doc.id,
-                    next_renewal_date: data.next_renewal_date?.toDate ? data.next_renewal_date.toDate().toISOString() : data.next_renewal_date,
-                    updated_at: data.updated_at?.toDate ? data.updated_at.toDate() : data.updated_at,
-                    created_at: data.created_at?.toDate ? data.created_at.toDate() : data.created_at
+                    next_renewal_date: convertFirestoreTimestamp(data.next_renewal_date),
+                    updated_at: convertFirestoreTimestamp(data.updated_at),
+                    created_at: convertFirestoreTimestamp(data.created_at)
                 };
             });
             
@@ -442,13 +454,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             // Update last updated time
             let lastUpdated = localStorage.getItem('lastSubscriptionUpdate');
             if (!lastUpdated && subscriptions.length > 0) {
-                const timestamps = subscriptions.map(sub => {
-                    const dateStr = sub.updated_at || sub.created_at;
-                    return dateStr ? new Date(dateStr) : null;
-                }).filter(date => date !== null);
+                const timestamps = subscriptions
+                    .map(sub => sub.updated_at || sub.created_at)
+                    .filter(date => date instanceof Date && !isNaN(date.getTime()));
 
                 if (timestamps.length > 0) {
-                    lastUpdated = new Date(Math.max(...timestamps));
+                    lastUpdated = new Date(Math.max(...timestamps.map(d => d.getTime())));
                 }
             }
             
