@@ -22,17 +22,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         applyFiltersMenu: document.getElementById('applyFiltersMenu'),
         subscriptionsList: document.getElementById('subscriptionsList'),
         sliderTrack: document.getElementById('slider-track')
-    };
-
-    // Firebase configuration
-    const firebaseConfig = {
-        apiKey: "AIzaSyDtUAf_vVUdR_sknDbFqdAG3lu6Zo0jp9o",
-        authDomain: "cloud-c8d3a.firebaseapp.com",
-        projectId: "cloud-c8d3a",
-        storageBucket: "cloud-c8d3a.appspot.com",
-        messagingSenderId: "768752961591",
-        appId: "1:768752961591:web:2cafa172dd2fe5a52fd7b2"
-    };
+    };    
 
     // Initialize Firebase if haven't
     if (!firebase.apps.length) {
@@ -160,7 +150,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 <td class="table-cell">
                     <div class="subscription-info">
                         <div class="subscription-icon ${getServiceClassName(sub.service_name)}">
-                            <i class="fas fa-${getServiceIcon(sub.service_name)}"></i>
+                            <i class="${getServiceIcon(sub.service_name)}"></i>
                         </div>
                         <div class="subscription-name">${sub.service_name}</div>
                     </div>
@@ -542,21 +532,22 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     function getServiceIcon(name) {
         const iconMap = {
-            'Netflix': 'film',
-            'Spotify': 'music',
-            'Amazon Prime': 'shopping-bag',
-            'New York Times': 'newspaper',
-            'Hulu': 'tv',
-            'YouTube': 'video',
-            'Disney+': 'magic',
-            'Apple Music': 'music',
-            'Adobe Creative Cloud': 'palette',
-            'Microsoft 365': 'file-word',
-            'HBO Max': 'film',
-            'PlayStation Plus': 'gamepad',
-            'Youtube Premium': 'video' 
+            'Netflix': 'fa-brands fa-netflix',
+            'Spotify': 'fa-brands fa-spotify',
+            'Amazon Prime': 'fa-brands fa-amazon',
+            'Hulu': 'fa-brands fa-hulu',
+            'YouTube': 'fa-brands fa-youtube',
+            'Disney+': 'fa-brands fa-disney',
+            'Apple Music': 'fa-brands fa-apple',
+            'New York Times': 'fa-solid fa-newspaper',
+            'Adobe Creative Cloud': 'fa-solid fa-palette',
+            'Microsoft 365': 'fa-solid fa-file-word',
+            'HBO Max': 'fa-solid fa-film',
+            'PlayStation Plus': 'fa-solid fa-gamepad',
+            'YouTube Premium': 'fa-solid fa-video',
+            'Default': 'fa-solid fa-question-circle'
         };
-        return iconMap[name] || 'credit-card';
+        return iconMap[name] || 'fa-solid fa-credit-card';
     }
 
     function getServiceClassName(name) {

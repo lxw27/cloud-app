@@ -1,5 +1,25 @@
 # Environment files
 .env
+*.env
 .env.local
-.env.development
-.env.production
+.env*.local
+
+# Firebase config (client-side)
+/firebase-config.js
+/task/firebase-config.js
+
+# Firebase functions config
+/functions/.env
+/functions/config.json
+
+# Node modules
+node_modules/
+
+# Firebase cache
+.firebase/
+.firebaserc
+
+# Python/venv (if applicable)
+__pycache__/
+*.py[cod]
+venv/

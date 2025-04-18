@@ -25,5 +25,20 @@
     "source": "functions",
     "runtime": "nodejs20",
     "region": "asia-southeast1"
-  }
+  },
+  "headers": [
+    {
+      "source": "/firebase-config.js",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/javascript"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "max-age=3600"
+        }
+      ]
+    }
+  ]
 }
