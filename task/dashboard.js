@@ -1,7 +1,4 @@
 document.addEventListener('DOMContentLoaded', async function() {
-    const auth = window.firebaseApp.auth;
-    const db = window.firebaseApp.db;
-
     // DOM elements
     const elements = {
         userMenuButton: document.getElementById('userMenuButton'),
@@ -112,6 +109,8 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Load subscriptions data from database
     async function loadSubscriptions(userId) {
+        const t = perf.trace('firestore_query_subscriptions');
+        t.start();
         try {
             const user = firebase.auth().currentUser;
             if (!user) return;
@@ -132,9 +131,13 @@ document.addEventListener('DOMContentLoaded', async function() {
             });
             initPriceRange();
             applyFilters();
+
+            t.putAttribute('count', allSubscriptions.length);
+            t.stop();
         } catch (error) {
-            console.error('Error loading subscriptions:', error);
-            showMessage('Failed to load subscriptions', 'error');
+            t.putAttribute('error', error.message);
+            t.stop();
+            throw error;
         }
     }
 

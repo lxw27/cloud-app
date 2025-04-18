@@ -1,4 +1,6 @@
-// Password validation (moved from Python)
+const provider = new firebase.auth.GoogleAuthProvider();
+
+// Password validation 
 function validatePassword(password, email) {
   // Check minimum length
   if (password.length < 6) {
@@ -33,11 +35,6 @@ function validatePassword(password, email) {
 
 // Initialize security features
 document.addEventListener('DOMContentLoaded', () => {  
-  const auth = window.firebaseApp.auth;
-  const db = window.firebaseApp.db;
-
-  const provider = new firebase.auth.GoogleAuthProvider();
-
   // Set security headers for API requests
   if (window.Headers) {
     const headers = new Headers();
@@ -94,7 +91,7 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
     loginButton.innerHTML = '<span class="button-loading"><i class="fas fa-spinner fa-spin"></i> Logging in...</span>';
     loginButton.disabled = true;
 
-    const userCredential = await firebase.auth().signInWithEmailAndPassword(email, password);
+    const userCredential = await auth.signInWithEmailAndPassword(email, password);
     const user = userCredential.user;
 
     if (!user.emailVerified) {

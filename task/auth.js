@@ -1,5 +1,3 @@
-import { getPerformance, trace } from "firebase/performance";
-
 // Enhanced authentication module with comprehensive security
 const AUTH_API_BASE = window.location.protocol + '//' + window.location.host + '/api/auth';
 
@@ -8,22 +6,40 @@ const SESSION_TIMEOUT = 30 * 60 * 1000;
 const AUTH_CHECK_TIMEOUT = 5000;
 let inactivityTimer;
 
-async function fetchWithTrace(url, options) {
-  const perf = getPerformance();
-  const t = trace(perf, `${options.method || 'GET'}_${url.split('/').pop()}`);
-  t.start();
+// Fetch with Firebase Performance Monitoring
+function fetchWithTrace(url, options) {
+  // Create trace instance
+  const trace = firebase.performance().trace(`fetch_${options.method || 'GET'}_${url.split('/').pop()}`);
+  trace.start();
 
-  try {
-    const response = await fetch(url, options);
-    t.putAttribute('status', response.status);
-    t.putMetric('contentSize', parseInt(response.headers.get('content-length') || 0));
-    t.stop();
-    return response;
-  } catch (error) {
-    t.putAttribute('error', error.message);
-    t.stop();
+  return fetch(url, options) 
+  .then(response => {
+    // Capture response metrics
+    trace.putMetric('responseCode', response.status);
+    trace.putAttribute('url', url);
+    trace.putAttribute('method', options.method || 'GET');
+
+    // Read content length if available
+    const contentLength = response.headers.get('content-length');
+    if (contentLength) {
+      trace.putMetric('contentSize', parseInt(contentLength));
+    }
+
+    // Ensure response is cloned before reading for future usage
+    return response.clone().text().then(body => {
+      trace.stop();
+      return response;
+    }).catch(() => {
+      trace.stop();
+      return response;
+    });
+  })
+  .catch(error => {
+    // Capture error details
+    trace.putAttribute('error', error.message);
+    trace.stop();
     throw error;
-  }
+  });
 }
 
 // Secure cookie handling
@@ -88,9 +104,9 @@ async function checkAuth() {
 
     authCheckAttempts = 0;
     const userData = await response.json();
+    resetInactivityTimer();
     t.putAttribute('userId', userData.uid || 'unknown');
     t.stop();
-    resetInactivityTimer();
     return userData;
     
   } catch (error) {

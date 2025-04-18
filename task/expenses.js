@@ -1,7 +1,4 @@
 document.addEventListener('DOMContentLoaded', async function() {
-    const auth = window.firebaseApp.auth;
-    const db = window.firebaseApp.db;
-
     // DOM elements
     const elements = {
         monthlyBtn: document.getElementById('monthlyBtn'),

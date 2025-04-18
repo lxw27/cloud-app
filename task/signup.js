@@ -1,9 +1,4 @@
-document.addEventListener('DOMContentLoaded', function() {
-  const auth = window.firebaseApp.auth;
-  const db = window.firebaseApp.db;
-
-  const provider = new firebase.auth.GoogleAuthProvider();
-})
+const provider = new firebase.auth.GoogleAuthProvider();
 
 // Configuration
 const ACCESS_TOKEN_EXPIRE_MINUTES = 30;

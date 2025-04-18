@@ -144,7 +144,7 @@ exports.sendRenewalReminders = onSchedule(
                         .join("");
             
                         await transporter.sendMail({
-                        from: gmailEmail,
+                        from: process.env.GMAIL_EMAIL,
                         to: userEmail,
                         subject: `Renewal Reminders for ${subscriptions.length} Subscription(s)`,
                         html: `
