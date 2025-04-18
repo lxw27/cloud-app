@@ -7,6 +7,7 @@
 # Firebase config (client-side)
 /firebase-config.js
 /task/firebase-config.js
+/task/.env 
 
 # Firebase functions config
 /functions/.env
