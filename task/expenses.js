@@ -1,13 +1,6 @@
-import { trace } from "firebase/performance";
-import {app, auth, db, perf, firebaseConfig } from './firebase-config.js';
-
 document.addEventListener('DOMContentLoaded', async function() {
-    // Initialize Firebase if haven't
-    if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
-    }
-
-    const db = firebase.firestore();
+    const auth = window.firebaseApp.auth;
+    const db = window.firebaseApp.db;
 
     // DOM elements
     const elements = {

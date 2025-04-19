@@ -1,13 +1,3 @@
-import {app, auth, db, perf, firebaseConfig } from './firebase-config.js';
-import { GoogleAuthProvider } from 'firebase/auth';
-
-if (!firebase.apps.length) {
-  firebase.initializeApp(firebaseConfig);
-}
-const auth = firebase.auth();
-const provider = new GoogleAuthProvider();
-const db = firebase.firestore();
-
 // Password validation (moved from Python)
 function validatePassword(password, email) {
   // Check minimum length
@@ -43,6 +33,11 @@ function validatePassword(password, email) {
 
 // Initialize security features
 document.addEventListener('DOMContentLoaded', () => {  
+  const auth = window.firebaseApp.auth;
+  const db = window.firebaseApp.db;
+
+  const provider = new firebase.auth.GoogleAuthProvider();
+
   // Set security headers for API requests
   if (window.Headers) {
     const headers = new Headers();

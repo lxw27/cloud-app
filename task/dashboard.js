@@ -1,6 +1,7 @@
-import {app, auth, db, perf, firebaseConfig } from './firebase-config.js';
-
 document.addEventListener('DOMContentLoaded', async function() {
+    const auth = window.firebaseApp.auth;
+    const db = window.firebaseApp.db;
+
     // DOM elements
     const elements = {
         userMenuButton: document.getElementById('userMenuButton'),
@@ -31,7 +32,6 @@ document.addEventListener('DOMContentLoaded', async function() {
         firebase.initializeApp(firebaseConfig);
     }
 
-    const db = firebase.firestore();
     let allSubscriptions = [];
     let currentSubscriptionId = null;
 

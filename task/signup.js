@@ -1,9 +1,9 @@
-import {app, auth, db, perf, firebaseConfig } from './firebase-config.js';
-import { GoogleAuthProvider } from 'firebase/auth';
+document.addEventListener('DOMContentLoaded', function() {
+  const auth = window.firebaseApp.auth;
+  const db = window.firebaseApp.db;
 
-const auth = firebase.auth();
-const provider = new GoogleAuthProvider();
-const db = firebase.firestore();
+  const provider = new firebase.auth.GoogleAuthProvider();
+})
 
 // Configuration
 const ACCESS_TOKEN_EXPIRE_MINUTES = 30;
