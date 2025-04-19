@@ -1,5 +1,8 @@
+import {app, auth, db, perf, firebaseConfig } from './firebase-config.js';
+import { GoogleAuthProvider } from 'firebase/auth';
+
 const auth = firebase.auth();
-const provider = new firebase.auth.GoogleAuthProvider();
+const provider = new GoogleAuthProvider();
 const db = firebase.firestore();
 
 // Configuration

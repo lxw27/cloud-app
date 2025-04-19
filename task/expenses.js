@@ -1,3 +1,6 @@
+import { trace } from "firebase/performance";
+import {app, auth, db, perf, firebaseConfig } from './firebase-config.js';
+
 document.addEventListener('DOMContentLoaded', async function() {
     // Initialize Firebase if haven't
     if (!firebase.apps.length) {
@@ -199,6 +202,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Load user data
     async function loadUserData(userId) {
+        const t = trace(perf, "load_user_data");
+        t.start();
+
         try {
             await loadSubscriptions(userId);
             generateExpenseData();
@@ -211,9 +217,13 @@ document.addEventListener('DOMContentLoaded', async function() {
             destroyCharts();
             state.pieChartInstance = initPieChart();
             state.barChartInstance = initBarChart(true);
+
+            t.putAttribute('subscriptionCount', state.allSubscriptions.length);
+            t.stop();
         } catch (error) {
-            console.error('Error loading user data:', error);
-            alert('Failed to load data. Please try again.');
+            t.putAttribute('error', error.message);
+            t.stop();
+            throw error;
         }
     }
 

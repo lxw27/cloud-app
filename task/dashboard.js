@@ -1,3 +1,5 @@
+import {app, auth, db, perf, firebaseConfig } from './firebase-config.js';
+
 document.addEventListener('DOMContentLoaded', async function() {
     // DOM elements
     const elements = {

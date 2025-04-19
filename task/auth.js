@@ -1,3 +1,5 @@
+import { getPerformance, trace } from "firebase/performance";
+
 // Enhanced authentication module with comprehensive security
 const AUTH_API_BASE = window.location.protocol + '//' + window.location.host + '/api/auth';
 
@@ -5,6 +7,24 @@ const AUTH_API_BASE = window.location.protocol + '//' + window.location.host + '
 const SESSION_TIMEOUT = 30 * 60 * 1000;
 const AUTH_CHECK_TIMEOUT = 5000;
 let inactivityTimer;
+
+async function fetchWithTrace(url, options) {
+  const perf = getPerformance();
+  const t = trace(perf, `${options.method || 'GET'}_${url.split('/').pop()}`);
+  t.start();
+
+  try {
+    const response = await fetch(url, options);
+    t.putAttribute('status', response.status);
+    t.putMetric('contentSize', parseInt(response.headers.get('content-length') || 0));
+    t.stop();
+    return response;
+  } catch (error) {
+    t.putAttribute('error', error.message);
+    t.stop();
+    throw error;
+  }
+}
 
 // Secure cookie handling
 function clearAuthCookies() {
@@ -34,11 +54,14 @@ let authCheckAttempts = 0;
 const MAX_AUTH_CHECK_ATTEMPTS = 3;
 
 async function checkAuth() {
+  const t = trace(perf, "auth_check");
+  t.start();
+
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), AUTH_CHECK_TIMEOUT);
 
-    const response = await fetch(`${AUTH_API_BASE}/me`, {
+    const response = await fetchWithTrace(`${AUTH_API_BASE}/me`, {
       method: 'GET',
       credentials: 'include',
       signal: controller.signal,
@@ -65,14 +88,17 @@ async function checkAuth() {
 
     authCheckAttempts = 0;
     const userData = await response.json();
+    t.putAttribute('userId', userData.uid || 'unknown');
+    t.stop();
     resetInactivityTimer();
     return userData;
     
   } catch (error) {
-    console.error('Authentication check failed:', error);
     clearUserData();
     redirectToLogin();
-    return null;
+    t.putAttribute('error', error.message);
+    t.stop();
+    throw error;
   }
 }
 
@@ -84,7 +110,7 @@ async function logout() {
       throw new Error('CSRF token missing');
     }
 
-    const response = await fetch(`${AUTH_API_BASE}/logout`, {
+    const response = await fetchWithTrace(`${AUTH_API_BASE}/logout`, {
       method: 'POST',
       credentials: 'include',
       headers: {
