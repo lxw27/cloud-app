@@ -127,9 +127,45 @@ document.addEventListener('DOMContentLoaded', async function() {
         return yearlyData;
     }
 
+    function getCurrentMonthSubscriptions() {
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+        const monthKey = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+    
+        return state.allSubscriptions.filter(sub => {
+            // Always include if created in this month (regardless of status)
+            if (sub.created_at) {
+                try {
+                    const createdDate = new Date(sub.created_at);
+                    const createdMonthKey = `${createdDate.getFullYear()}-${String(createdDate.getMonth() + 1).padStart(2, '0')}`;
+                    if (createdMonthKey === monthKey) {
+                        return true;
+                    }
+                } catch (e) {
+                    console.error('Invalid created_at date format:', sub.created_at);
+                }
+            }
+            
+            // Only include renewals if status is active
+            if (sub.next_renewal_date && sub.status?.toLowerCase() === 'active') {
+                try {
+                    const subDate = new Date(sub.next_renewal_date);
+                    const subMonthKey = `${subDate.getFullYear()}-${String(subDate.getMonth() + 1).padStart(2, '0')}`;
+                    return subMonthKey === monthKey;
+                } catch (e) {
+                    console.error('Invalid next_renewal_date format:', sub.next_renewal_date);
+                    return false;
+                }
+            }
+            
+            return false;
+        });
+    }
+
     function calculateTotalMonthly() {
-        const activeSubs = state.allSubscriptions.filter(sub => sub.status.toLowerCase() === 'active');
-        return activeSubs.reduce((sum, sub) => sum + getMonthlyEquivalent(sub.cost, sub.billing_cycle), 0);
+        const currentMonthSubs = getCurrentMonthSubscriptions();
+        return currentMonthSubs.reduce((sum, sub) => sum + getMonthlyEquivalent(sub.cost, sub.billing_cycle), 0);
     }
 
     function generateTableRows() {
@@ -192,7 +228,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Load user data
     async function loadUserData(userId) {
-        const t = trace(perf, "load_user_data");
+        const t = perf.trace("load_user_data");
         t.start();
 
         try {
@@ -301,8 +337,8 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     // Update dashboard metadata
     function updateDashboardMetadata() {
-        const activeSubs = state.allSubscriptions.filter(sub => sub.status.toLowerCase() === 'active');
-        const monthlyTotal = activeSubs.reduce((sum, sub) => sum + getMonthlyEquivalent(sub.cost, sub.billing_cycle), 0);
+        const currentMonthSubs = getCurrentMonthSubscriptions();
+        const monthlyTotal = currentMonthSubs.reduce((sum, sub) => sum + getMonthlyEquivalent(sub.cost, sub.billing_cycle), 0);
         const yearlyProjection = monthlyTotal * 12;
         const currentDate = new Date().toLocaleDateString('en-US', { 
             month: 'long', 
@@ -328,13 +364,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                 Yearly projection: RM ${yearlyProjection.toFixed(2)}
             `;
         }
-        
-        // Update values in table footer
-        const totals = document.querySelectorAll('.totals-value');
-        if (totals.length >= 2) {
-            totals[0].textContent = `RM ${monthlyTotal.toFixed(2)}`;
-            totals[1].textContent = `RM ${yearlyProjection.toFixed(2)}`;
-        }
     }
 
     // Load subscription expenses into table
@@ -348,7 +377,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             row.innerHTML = `
                 <td>
                     <div class="subscription-info">
-                        <div class="subscription-icon ${getIconForSubscription(sub.service_name)}">
+                        <div class="subscription-icon">
                             <i class="${getServiceIcon(sub.service_name)}"></i>
                         </div>
                         <div class="subscription-details">
@@ -572,6 +601,26 @@ document.addEventListener('DOMContentLoaded', async function() {
         }, 50);
     }
 
+    function getServiceIcon(name) {
+        const iconMap = {
+            'Netflix': 'fa-brands fa-netflix',
+            'Spotify': 'fa-brands fa-spotify',
+            'Amazon Prime': 'fa-brands fa-amazon',
+            'Hulu': 'fa-brands fa-hulu',
+            'YouTube': 'fa-brands fa-youtube',
+            'Disney+': 'fa-brands fa-disney',
+            'Apple Music': 'fa-brands fa-apple',
+            'New York Times': 'fa-solid fa-newspaper',
+            'Adobe Creative Cloud': 'fa-solid fa-palette',
+            'Microsoft 365': 'fa-solid fa-file-word',
+            'HBO Max': 'fa-solid fa-film',
+            'PlayStation Plus': 'fa-solid fa-gamepad',
+            'YouTube Premium': 'fa-solid fa-video',
+            'Default': 'fa-solid fa-question-circle'
+        };
+        return iconMap[name] || 'fa-solid fa-credit-card';
+    }
+
     // Update period dropdown based on view type
     function updatePeriodDropdown(isMonthly) {
         if (!elements.periodSelect) return;
@@ -602,44 +651,103 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     function filterSubscriptionsByMonth(monthKey) {
+        const [year, month] = monthKey.split('-').map(Number);
+        
         return state.allSubscriptions.filter(sub => {
-            if (!sub.next_renewal_date) return false;
-            const subDate = new Date(sub.next_renewal_date);
-            const subMonthKey = `${subDate.getFullYear()}-${String(subDate.getMonth() + 1).padStart(2, '0')}`;
-            return subMonthKey === monthKey;
+            // Always include if created in this month (regardless of status)
+            if (sub.created_at) {
+                try {
+                    const createdDate = new Date(sub.created_at);
+                    const createdMonthKey = `${createdDate.getFullYear()}-${String(createdDate.getMonth() + 1).padStart(2, '0')}`;
+                    if (createdMonthKey === monthKey) {
+                        return true;
+                    }
+                } catch (e) {
+                    console.error('Invalid created_at date format:', sub.created_at);
+                }
+            }
+            
+            // Only include renewals if status is active
+            if (sub.next_renewal_date && sub.status?.toLowerCase() === 'active') {
+                try {
+                    const subDate = new Date(sub.next_renewal_date);
+                    const subMonthKey = `${subDate.getFullYear()}-${String(subDate.getMonth() + 1).padStart(2, '0')}`;
+                    return subMonthKey === monthKey;
+                } catch (e) {
+                    console.error('Invalid next_renewal_date format:', sub.next_renewal_date);
+                    return false;
+                }
+            }
+            
+            return false;
         });
     }
-
+    
     function filterSubscriptionsByYear(year) {
         return state.allSubscriptions.filter(sub => {
-            if (!sub.next_renewal_date) return false;
-            try {
-                const subDate = new Date(sub.next_renewal_date);
-                return subDate.getFullYear().toString() === year;
-            } catch (e) {
-                console.error('Invalid date format:', sub.next_renewal_date);
-                return false;
+            // Always include if created in this year (regardless of status)
+            if (sub.created_at) {
+                try {
+                    const createdDate = new Date(sub.created_at);
+                    if (createdDate.getFullYear().toString() === year) {
+                        return true;
+                    }
+                } catch (e) {
+                    console.error('Invalid created_at date format:', sub.created_at);
+                }
             }
+            
+            // Only include renewals if status is active
+            if (sub.next_renewal_date && sub.status?.toLowerCase() === 'active') {
+                try {
+                    const subDate = new Date(sub.next_renewal_date);
+                    return subDate.getFullYear().toString() === year;
+                } catch (e) {
+                    console.error('Invalid date format:', sub.next_renewal_date);
+                    return false;
+                }
+            }
+            
+            return false;
         });
     }
     
     function updateUIWithFilteredData(filteredSubs) {
         updateExpenseBreakdownTable(filteredSubs);
         updateChartsWithFilteredData(filteredSubs);
-        updateDashboardMetadata();
+        updateDashboardMetadata(filteredSubs);
     }
 
+    // Function to correctly update the expense breakdown table when filtering
     function updateExpenseBreakdownTable(filteredSubs) {
         if (!elements.expenseBreakdown) return;
+        
+        // Get the table element (parent of expenseBreakdown which is the tbody)
+        const table = elements.expenseBreakdown.closest('table');
+        if (!table) return;
+        
+        // Find the tfoot element
+        const tfoot = table.querySelector('tfoot');
+        if (!tfoot) return;
+        
+        // Calculate totals from the filtered subscriptions
+        const monthlyTotal = filteredSubs.reduce((sum, sub) => {
+            return sum + getMonthlyEquivalent(sub.cost, sub.billing_cycle);
+        }, 0);
+        
+        const yearlyProjection = monthlyTotal * 12;
+        
+        // Clear the tbody (subscription rows)
         elements.expenseBreakdown.innerHTML = '';
         
+        // Add filtered subscription rows to tbody
         filteredSubs.forEach(sub => {
             const monthlyEquivalent = getMonthlyEquivalent(sub.cost, sub.billing_cycle);
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>
                     <div class="subscription-info">
-                        <div class="subscription-icon ${getIconForSubscription(sub.service_name)}">
+                        <div class="subscription-icon">
                             <i class="${getServiceIcon(sub.service_name)}"></i>
                         </div>
                         <div class="subscription-details">
@@ -660,6 +768,16 @@ document.addEventListener('DOMContentLoaded', async function() {
             `;
             elements.expenseBreakdown.appendChild(row);
         });
+        
+        // Update the values in the tfoot - simplified approach
+        const totalValueCells = tfoot.querySelectorAll('.totals-value');
+        if (totalValueCells.length >= 2) {
+            // First cell - Monthly Total
+            totalValueCells[0].textContent = `RM ${monthlyTotal.toFixed(2)}`;
+            
+            // Second cell - Yearly Projection
+            totalValueCells[1].textContent = `RM ${yearlyProjection.toFixed(2)}`;
+        }
     }
 
     function updateChartsWithFilteredData(filteredSubs) {
