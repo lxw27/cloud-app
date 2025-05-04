@@ -1,5 +1,11 @@
 {
   "hosting": {
+    "headers": [{
+      "source": "**",
+      "headers": [
+        {"key": "Cache-Control", "value": "public, max-age=3600"}
+      ]
+    }],
     "public": "task",
     "ignore": [
       "firebase.json",
@@ -16,7 +22,7 @@
         "destination": "/login.html"
       },
       {
-        "source": "**", 
+        "source": "**",
         "destination": "/login.html"
       }
     ]
@@ -40,5 +46,17 @@
         }
       ]
     }
-  ]
+  ],
+  "emulators": {
+    "functions": {
+      "port": 5001
+    },
+    "hosting": {
+      "port": 5000
+    },
+    "ui": {
+      "enabled": true
+    },
+    "singleProjectMode": true
+  }
 }

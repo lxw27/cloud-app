@@ -126,17 +126,24 @@ document.addEventListener('DOMContentLoaded', async function() {
                     subscription_id: doc.id,
                     next_renewal_date: data.next_renewal_date?.toDate ? data.next_renewal_date.toDate().toISOString() : data.next_renewal_date,
                     created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : data.created_at,
-                    updated_at: data.updated_at?.toDate ? data.updated_at.toDate().toISOString() : data.updated_at 
+                    updated_at: data.updated_at?.toDate ? data.updated_at.toDate().toISOString() : data.updated_at,
+                    cancelled_at: data.cancelled_at?.toDate ? data.cancelled_at.toDate().toISOString() : data.cancelled_at
                 };
             });
             initPriceRange();
             applyFilters();
 
-            t.putAttribute('count', allSubscriptions.length);
+            t.putAttribute('count', allSubscriptions.length.toString());
             t.stop();
         } catch (error) {
             t.putAttribute('error', error.message);
             t.stop();
+            logError({
+                type: 'LOAD_SUBSCRIPTIONS_ERROR',
+                message: error.message,
+                user_id: userId,
+                page: 'dashboard'
+            });
             throw error;
         }
     }
@@ -270,15 +277,23 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         const user = await ensureAuthenticated();
         const id = document.getElementById('subscriptionId').value;
+        const status = capitalizeFirstLetter(document.getElementById('subscriptionStatus').value);
         
         const subData = {
             service_name: document.getElementById('subscriptionName').value,
             cost: parseFloat(document.getElementById('subscriptionCost').value),
             billing_cycle: capitalizeFirstLetter(document.getElementById('billingCycle').value),
             next_renewal_date: document.getElementById('nextRenewal').value,
-            status: capitalizeFirstLetter(document.getElementById('subscriptionStatus').value),
+            status: status,
             user_id: user.uid
         };
+
+        if (id && status === 'Cancelled') {
+            const existingDoc = await db.collection('subscriptions').doc(id).get();
+            if (existingDoc.exists && existingDoc.data().status !== 'Cancelled') {
+                subData.cancelled_at = firebase.firestore.FieldValue.serverTimestamp();
+            }
+        }
     
         try {
             if (id) {
@@ -434,7 +449,8 @@ document.addEventListener('DOMContentLoaded', async function() {
                     subscription_id: doc.id,
                     next_renewal_date: convertFirestoreTimestamp(data.next_renewal_date),
                     updated_at: convertFirestoreTimestamp(data.updated_at),
-                    created_at: convertFirestoreTimestamp(data.created_at)
+                    created_at: convertFirestoreTimestamp(data.created_at),
+                    cancelled_at: convertFirestoreTimestamp(data.cancelled_at)
                 };
             });
             

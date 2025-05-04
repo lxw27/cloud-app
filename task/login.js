@@ -84,8 +84,8 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
   const loginButton = document.querySelector('.btn-login');
   const originalButtonText = loginButton.textContent;
 
-  const existingError = document.querySelector('.error-message');
-  if (existingError) existingError.remove();
+  // const existingError = document.querySelector('.error-message');
+  // if (existingError) existingError.remove();
   
   try {
     loginButton.innerHTML = '<span class="button-loading"><i class="fas fa-spinner fa-spin"></i> Logging in...</span>';
@@ -126,7 +126,34 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
     window.location.href = 'dashboard.html';
     
   } catch (error) {
-    console.error('Login error:', error);
+    let errorMessage;
+  
+    switch (error.code) {
+      case 'auth/user-not-found':
+        errorMessage = 'No account found with this email address';
+        break;
+      case 'auth/wrong-password':
+        errorMessage = 'Incorrect password';
+        break;
+      case 'auth/invalid-email':
+        errorMessage = 'Invalid email format';
+        break;
+      case 'auth/user-disabled':
+        errorMessage = 'This account has been disabled';
+        break;
+      case 'auth/too-many-requests':
+        errorMessage = 'Too many unsuccessful login attempts. Please try again later';
+        break;
+      default:
+        errorMessage = error.message || 'Login failed. Please try again';
+    }
+    
+    logError({
+      type: 'LOGIN_ERROR',
+      message: error.message,
+      code: error.code,
+      page: 'login'
+    });
     showErrorMessage(error.message || "Login failed. Please check your credentials");
   } finally {
     loginButton.innerHTML = originalButtonText;

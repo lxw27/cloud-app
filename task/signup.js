@@ -276,6 +276,13 @@ document.getElementById('signupForm').addEventListener('submit', async function(
       } else if (error.code === 'auth/weak-password') {
         errorMessage = "Password is too weak. Please use a stronger password.";
       }
+
+      logError({
+        type: 'EMAIL_SIGNUP_ERROR',
+        message: error.message,
+        code: error.code || 'unknown',
+        page: 'signup'
+      });
       
       showErrorMessage(errorMessage);
     } finally {
@@ -406,6 +413,13 @@ document.getElementById('googleSignUp')?.addEventListener('click', async functio
       }
     }
     
+    logError({
+      type: 'GOOGLE_SIGNUP_ERROR',
+      message: error.message,
+      code: error.code || 'unknown',
+      page: 'signup'
+    });
+
     showErrorMessage(errorMessage);
   } finally {
     // Reset button state to clickable

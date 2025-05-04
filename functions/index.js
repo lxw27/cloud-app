@@ -170,3 +170,36 @@ exports.sendRenewalReminders = onSchedule(
         }
     }
 );
+
+const cors = require('cors')({ origin: true });
+const functions = require('firebase-functions/v2');
+
+exports.logError = functions.https.onRequest(async (req, res) => {
+    res.set('Access-Control-Allow-Origin', 'https://cloud-c8d3a.web.app');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+
+    return cors(req, res, async() => {
+        if (req.method === 'OPTIONS') {
+            return res.status(204).send('');
+        }
+
+        // Security: Validate requests if needed
+        if (req.method !== 'POST') {
+            return res.status(403).send('Forbidden');
+        }
+
+        const errorData = req.body;
+        
+        try {
+            await admin.firestore().collection('error_logs').add({
+            ...errorData,
+            serverTimestamp: admin.firestore.FieldValue.serverTimestamp()
+            });
+            res.status(200).send('Error logged');
+        } catch (error) {
+            logger.error('Failed to log error:', error);
+            res.status(500).send('Logging failed');
+        }
+    });
+});

@@ -79,12 +79,8 @@ document.addEventListener('DOMContentLoaded', async function() {
             
             let total = 0;
             activeSubs.forEach(sub => {
-                if (sub.next_renewal_date) {
-                    const subDate = new Date(sub.next_renewal_date);
-                    const subMonthKey = `${subDate.getFullYear()}-${String(subDate.getMonth() + 1).padStart(2, '0')}`;
-                    if (subMonthKey === monthKey) {
-                        total += getMonthlyEquivalent(sub.cost, sub.billing_cycle);
-                    }
+                if (wasSubscriptionActiveInMonth(sub, year, date.getMonth() + 1)) {
+                    total += getMonthlyEquivalent(sub.cost, sub.billing_cycle);
                 }
             });
             
@@ -97,6 +93,37 @@ document.addEventListener('DOMContentLoaded', async function() {
         
         return monthlyData;
     }
+
+    function wasSubscriptionActiveInMonth(subscription, year, month) {
+        try {
+            const createdDate = subscription.created_at?.toDate
+                ? subscription.created_at.toDate()
+                : new Date(subscription.created_at);
+
+            const cancelledDate = subscription.cancelled_at?.toDate 
+                ? subscription.cancelled_at.toDate()
+                : subscription.cancelled_at 
+                    ? new Date(subscription.cancelled_at)
+                    : null;
+
+            if (createdDate.getFullYear() > year || (createdDate.getFullYear() === year && createdDate.getMonth() + 1 > month)) {
+                return false;
+            }
+
+            if (cancelledDate && (cancelledDate.getFullYear() < year || (cancelledDate.getFullYear() === year && cancelledDate.getMonth() + 1 < month))) {
+                return false;
+            }
+
+            if (subscription.status?.toLowerCase() !== 'active') {
+                return false;
+            }
+
+            return true;
+        } catch (e) {
+            console.error('Error checking subscription active status:', e);
+            return false;
+        }
+    }
     
     function generateYearlyDataForBarChart(activeSubs) {
         const now = new Date();
@@ -108,13 +135,10 @@ document.addEventListener('DOMContentLoaded', async function() {
             let total = 0;
     
             activeSubs.forEach(sub => {
-                if (sub.next_renewal_date) {
-                    const subDate = new Date(sub.next_renewal_date);
-                    if (subDate.getFullYear() === year) {
-                        total += sub.billing_cycle?.toLowerCase() === 'yearly' 
-                            ? sub.cost 
-                            : sub.cost * 12;
-                    }
+                if (wasSubscriptionActiveInYear(sub, year)) {
+                    total += sub.billing_cycle?.toLowerCase() === 'yearly' 
+                        ? sub.cost 
+                        : sub.cost * 12;
                 }
             });
             
@@ -125,6 +149,37 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
         
         return yearlyData;
+    }
+
+    function wasSubscriptionActiveInYear(subscription, year) {
+        try {
+            const createdDate = subscription.created_at?.toDate 
+                ? subscription.created_at.toDate() 
+                : new Date(subscription.created_at);
+            
+            const cancelledDate = subscription.cancelled_at?.toDate 
+                ? subscription.cancelled_at.toDate() 
+                : subscription.cancelled_at 
+                    ? new Date(subscription.cancelled_at) 
+                    : null;
+            
+            if (createdDate.getFullYear() > year) {
+                return false;
+            }
+            
+            if (cancelledDate && cancelledDate.getFullYear() < year) {
+                return false;
+            }
+            
+            if (subscription.status?.toLowerCase() !== 'active') {
+                return false;
+            }
+            
+            return true;
+        } catch (e) {
+            console.error('Error checking subscription active status:', e);
+            return false;
+        }
     }
 
     function getCurrentMonthSubscriptions() {
@@ -208,6 +263,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
             firebase.auth().onAuthStateChanged(handleAuthStateChange);
         } catch (error) {
+            logError({
+                type: 'AUTH_ERROR',
+                message: `Authentication failed: ${error.message}`,
+                error: error.message,
+                page: 'expenses'
+            });
             console.error('Auth initialization failed:', error);
             window.location.href = 'login.html';
         }
@@ -267,7 +328,8 @@ document.addEventListener('DOMContentLoaded', async function() {
                     subscription_id: doc.id,
                     next_renewal_date: data.next_renewal_date?.toDate ? data.next_renewal_date.toDate().toISOString() : data.next_renewal_date,
                     created_at: data.created_at?.toDate ? data.created_at.toDate().toISOString() : data.created_at,
-                    updated_at: data.updated_at?.toDate ? data.updated_at.toDate().toISOString() : data.updated_at 
+                    updated_at: data.updated_at?.toDate ? data.updated_at.toDate().toISOString() : data.updated_at,
+                    cancelled_at: data.cancelled_at?.toDate ? data.cancelled_at.toDate().toISOString() : data.cancelled_at
                 };
             });
         } catch (error) {
@@ -1043,6 +1105,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             try {
                 await generatePDFReport();
             } catch (error) {
+                logError({
+                    type: 'REPORT_GENERATION_ERROR',
+                    message: `Failed to generate report: ${error.message}`,
+                    error: error.message,
+                    page: 'expenses'
+                });
                 console.error('Error generating PDF:', error);
                 alert('Failed to generate PDF: ' + error.message);
             } finally {
